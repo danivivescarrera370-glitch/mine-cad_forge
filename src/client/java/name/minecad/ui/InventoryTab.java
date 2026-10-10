@@ -15,7 +15,7 @@ public class InventoryTab extends AbstractButton {
 	private Runnable action;
 	private boolean selected;
 
-	private final InventoryTabWindow window;
+	private InventoryTabWindow window;
 
 
 	public InventoryTab(int x, int y, Component name, ItemStack icon, boolean selected, Runnable action, InventoryTabWindow window) {
@@ -45,10 +45,6 @@ public class InventoryTab extends AbstractButton {
 
 	public void setAction(Runnable action) {
 		this.action = action;
-	}
-
-	public InventoryTabWindow getWindow() {
-		return window;
 	}
 
 	@Override

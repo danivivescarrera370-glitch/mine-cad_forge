@@ -4,7 +4,6 @@ import name.minecad.client.commands.MineFabClientCommands;
 import name.minecad.client.render.SelectionOutlineRenderer;
 import name.minecad.ui.InventoryTab;
 import name.minecad.ui.InventoryTabManager;
-import name.minecad.ui.InventoryTabWindow;
 import name.minecad.ui.MineFabSettings;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -13,7 +12,7 @@ import net.minecraft.network.chat.Component;
 public class MineCadClient implements ClientModInitializer {
 	private static InventoryTabManager inventoryTabManager;
 	private static int pendingTabsOffsetX = 200;
-	private static int pendingTabsOffsetY = 20;
+	private static int pendingTabsOffsetY = 0;
 
 	public static void setAdditionalTabsOffset(int xOffset, int yOffset) {
 		pendingTabsOffsetX = xOffset;
@@ -38,9 +37,6 @@ public class MineCadClient implements ClientModInitializer {
 		MineFabClientCommands.register();
 		SelectionOutlineRenderer.register();
 
-		InventoryTabWindow mineCadWindow = new InventoryTabWindow(176, 166);
-		mineCadWindow.setTitle(Component.literal("MineCad"));
-
 		InventoryTab mineCadTab = new InventoryTab(
 				0,
 				0,
@@ -48,8 +44,7 @@ public class MineCadClient implements ClientModInitializer {
 				null,
 				false,
 				() -> {
-				},
-				mineCadWindow
+				}
 		);
 		inventoryTabManager = new InventoryTabManager(mineCadTab);
 		inventoryTabManager.setAdditionalTabsOffset(pendingTabsOffsetX, pendingTabsOffsetY);

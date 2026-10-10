@@ -12,6 +12,7 @@ public class InventoryTabWindow {
 
   private int width;
   private int height;
+  private InventoryTabWindow nextWindow;
   private final String backgroundTextureFilePath;
   private int backgroundColor = DEFAULT_BACKGROUND_COLOR;
   private Component title = Component.literal("MineCad");
@@ -26,7 +27,12 @@ public class InventoryTabWindow {
   }
 
   public InventoryTabWindow(int width, int height) {
-    this(width, height, null);
+    this(width, height, (String) null);
+  }
+
+  public InventoryTabWindow(int width, int height, InventoryTabWindow nextWindow) {
+    this(width, height);
+    this.nextWindow = nextWindow;
   }
 
   public void setBackgroundColor(int argbColor) {

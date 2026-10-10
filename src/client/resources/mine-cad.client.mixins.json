@@ -3,6 +3,7 @@
 	"package": "name.minecad.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"AbstractContainerScreenAccessor",
 		"AbstractContainerScreenMixin",
 		"CreativeModeInventoryScreenMixin",
 		"ExampleClientMixin"

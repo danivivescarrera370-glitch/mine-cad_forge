@@ -14,7 +14,11 @@ public class MyGuiScreen extends Screen {
 
     @Override
     protected void init() {
-        addRenderableWidget(Button.builder(Component.literal("Back"), button -> onClose()).bounds(this.width / 2 - 50, this.height - 40, 100, 20).build());
+        addRenderableWidget(
+                Button.builder(Component.literal("Back"), button -> onClose())
+                        .bounds(this.width / 2 - 50, this.height - 40, 100, 20)
+                        .build()
+        );
     }
 
     @Override

@@ -5,6 +5,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.world.item.CreativeModeTab;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -18,5 +20,16 @@ public abstract class CreativeModeInventoryScreenMixin {
 			cir.setReturnValue(false);
 		}
 	}
-}
 
+	@Shadow
+	private static CreativeModeTab selectedTab;
+
+	// While the custom tab is active, no vanilla tab matches "selectedTab", so all draw with their unselected (gray) sprites.
+	@Redirect(
+			method = "extractTabButton",
+			at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/screens/inventory/CreativeModeInventoryScreen;selectedTab:Lnet/minecraft/world/item/CreativeModeTab;", opcode = 178)
+	)
+	private CreativeModeTab minecad$noSelectedTab() {
+		return InventoryOverlayState.isBlocking(this) ? null : selectedTab;
+	}
+}

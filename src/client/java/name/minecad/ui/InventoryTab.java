@@ -47,6 +47,14 @@ public class InventoryTab extends AbstractButton {
 		this.action = action;
 	}
 
+	public InventoryTabWindow getWindow() {
+		return window;
+	}
+
+	public void setWindow(InventoryTabWindow window) {
+		this.window = window;
+	}
+
 	@Override
 	public void onPress(InputWithModifiers inputWithModifiers) {
 		action.run();
@@ -87,5 +95,3 @@ public class InventoryTab extends AbstractButton {
 		defaultButtonNarrationText(narrationElementOutput);
 	}
 }
-
-

@@ -25,6 +25,11 @@ public final class InventoryTabManager {
     private InventoryTabView activeInventoryTab = InventoryTabView.VANILLA;
     private final InventoryTab mineCadTab;
     private Screen currentScreen;
+    // Last known window origin and mouse position (updated every frame while a screen is shown).
+    private int lastScreenLeft;
+    private int lastScreenTop;
+    private double lastMouseX;
+    private double lastMouseY;
 
     public InventoryTabManager(InventoryTab mineCadTab) {
         this.mineCadTab = mineCadTab;
@@ -65,42 +70,64 @@ public final class InventoryTabManager {
              } else {
                  setActiveInventoryTab(InventoryTabView.MINE_CAD, tabs[0], tabs[1]);
              }
+             // Bind overlay state to the screen this tab actually lives on (not a possibly stale shared field).
+             currentScreen = screen;
+             syncOverlayState();
+         });
+         // Re-sync before vanilla draws its tabs each frame so they always reflect the active view.
+         ScreenEvents.beforeExtract(screen).register((s, graphics, mouseX, mouseY, tickProgress) -> {
+             currentScreen = s;
+             syncOverlayState();
          });
          Screens.getWidgets(screen).add(tabs[1]);
 
-      // One window per screen; position and size are read from the real vanilla screen every time.
-      InventoryTabWindow window = new InventoryTabWindow(backgroundWidth, backgroundHeight);
+      // Prefer the window attached to this tab so callers can provide custom windows per tab.
+      final InventoryTabWindow configuredWindow = tabs[1].getWindow();
+      final InventoryTabWindow window = configuredWindow != null ? configuredWindow : new InventoryTabWindow(backgroundWidth, backgroundHeight);
       {
         ScreenMouseEvents.allowMouseClick(screen).register((currentScreen, event) -> {
             int[] b = bounds(currentScreen, backgroundWidth, backgroundHeight);
-            return !isWindowInteractionBlocked(tabs[1], event.x(), event.y(), b[0], b[1], b[2], b[3]);
+
+            // Check if the click is inside the MineCad tab window area and if the MineCad tab is selected.
+            boolean blocked = isWindowInteractionBlocked(tabs[1], window, event.x(), event.y(), b[0], b[1]);
+            if (blocked) {
+                // Tell the window chain about the click (topmost window under the cursor gets it).
+                window.dispatchClick(b[0], b[1], event.x(), event.y(), event.button());
+            }
+            return !blocked;
         });
         ScreenMouseEvents.allowMouseRelease(screen).register((currentScreen, event) -> {
             int[] b = bounds(currentScreen, backgroundWidth, backgroundHeight);
-            return !isWindowInteractionBlocked(tabs[1], event.x(), event.y(), b[0], b[1], b[2], b[3]);
+            return !isWindowInteractionBlocked(tabs[1], window, event.x(), event.y(), b[0], b[1]);
         });
         ScreenMouseEvents.allowMouseDrag(screen).register((currentScreen, event, horizontalAmount, verticalAmount) -> {
             int[] b = bounds(currentScreen, backgroundWidth, backgroundHeight);
-            return !isWindowInteractionBlocked(tabs[1], event.x(), event.y(), b[0], b[1], b[2], b[3]);
+            return !isWindowInteractionBlocked(tabs[1], window, event.x(), event.y(), b[0], b[1]);
         });
         ScreenMouseEvents.allowMouseScroll(screen).register((currentScreen, mouseX, mouseY, horizontalAmount, verticalAmount) -> {
             int[] b = bounds(currentScreen, backgroundWidth, backgroundHeight);
-            return !isWindowInteractionBlocked(tabs[1], mouseX, mouseY, b[0], b[1], b[2], b[3]);
+            return !isWindowInteractionBlocked(tabs[1], window, mouseX, mouseY, b[0], b[1]);
         });
         ScreenEvents.afterExtract(screen).register((currentScreen, graphics, mouseX, mouseY, tickProgress) -> {
           int[] b = bounds(currentScreen, backgroundWidth, backgroundHeight);
           int x = b[0];
           int y = b[1];
+          // Remember where the window is and where the mouse is, for isMouseInsideWindow().
+          lastScreenLeft = x;
+          lastScreenTop = y;
+          lastMouseX = mouseX;
+          lastMouseY = mouseY;
           // Update tab position based on the vanilla screen's actual position
           tabs[1].setX(x + additionalTabsOffsetX);
           tabs[1].setY((y - TAB_HEIGHT) + additionalTabsOffsetY);
 
           if (activeInventoryTab == InventoryTabView.MINE_CAD && tabs[1].isSelectedTab()) {
+            // Root window always fills the vanilla inventory area; nested windows keep their own sizes.
             window.setSize(b[2], b[3]);
             window.drawWindow(graphics, currentScreen.getFont(), x, y);
 
             // Vanilla may have requested a scrollbar/text cursor underneath; the last request wins.
-            if (isInside(mouseX, mouseY, x, y, b[2], b[3])) {
+            if (window.containsPoint(x, y, mouseX, mouseY)) {
               graphics.requestCursor(CursorTypes.ARROW);
             }
           }
@@ -169,11 +196,21 @@ public final class InventoryTabManager {
         );
     }
 
-  private boolean isWindowInteractionBlocked(InventoryTab tab, double mouseX, double mouseY, int x, int y, int width, int height) {
+  private boolean isWindowInteractionBlocked(InventoryTab tab, InventoryTabWindow window, double mouseX, double mouseY, int x, int y) {
     return activeInventoryTab == InventoryTabView.MINE_CAD
         && tab != null
         && tab.isSelectedTab()
-        && isInside(mouseX, mouseY, x, y, width, height);
+        && window != null
+        && window.containsPoint(x, y, mouseX, mouseY);
+  }
+
+  /** True while the MineCad tab is open and the mouse is inside the given window (the root window or any nested one). */
+  public boolean isMouseInsideWindow(InventoryTabWindow window) {
+    InventoryTabWindow root = mineCadTab.getWindow();
+    return window != null
+        && root != null
+        && activeInventoryTab == InventoryTabView.MINE_CAD
+        && mineCadTab.isSelectedTab()
+        && root.isPointInside(lastScreenLeft, lastScreenTop, window, lastMouseX, lastMouseY);
   }
 }
-

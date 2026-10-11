@@ -1,14 +1,19 @@
 package name.minecad.client;
 
+import name.minecad.MineCad;
 import name.minecad.client.commands.MineFabClientCommands;
 import name.minecad.client.render.SelectionOutlineRenderer;
+import name.minecad.scannedblock.ScannedBlockManager;
 import name.minecad.ui.InventoryTab;
 import name.minecad.ui.InventoryTabManager;
 import name.minecad.ui.InventoryTabWindow;
 import name.minecad.ui.InventoryTabWindow3DRenderer;
 import name.minecad.ui.InventoryTabWindowButton;
 import name.minecad.ui.MineFabSettings;
+import name.minecad.ui.ScenePipRenderer;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.minecraft.network.chat.Component;
 
@@ -39,9 +44,12 @@ public class MineCadClient implements ClientModInitializer {
 		MineFabSettings.load();
 		MineFabClientCommands.register();
 		SelectionOutlineRenderer.register();
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clearBlockManager());
+
+		// The 3D preview is drawn by the GPU through the game's picture-in-picture pipeline.
+		PictureInPictureRendererRegistry.register(context -> new ScenePipRenderer());
 
 		InventoryTabWindow mainWindow = new InventoryTabWindow(176, 166);
-		mainWindow.setTitle(Component.literal("MineCad"));
 		mainWindow.setPadding(4); // keeps children away from the main window edges
 
 		// Two windows inside the main window: a top one and a bottom one, each half of the usable height.
@@ -54,23 +62,35 @@ public class MineCadClient implements ClientModInitializer {
 		topWindow.setRelativeSize(1.0, 0.78); // scales with the inventory in survival/creative/etc.
 
 		InventoryTabWindow bottomWindow = mainWindow.addChild(new InventoryTabWindow(100, 10));
-		bottomWindow.setTitle(Component.literal("Inspector"));
+//		bottomWindow.setTitle(Component.literal("Inspector"));
 		bottomWindow.setBackgroundColor(0xFFECECEC);
 		bottomWindow.setAnchor(InventoryTabWindow.Anchor.BOTTOM);
 		bottomWindow.setMargin(2);
 		bottomWindow.setRelativeSize(1.0, 0.22); // scales with the inventory in survival/creative/etc.
 
+		// settings button
+		InventoryTabWindowButton settingsButton = bottomWindow.addButton("Settings", () -> {
+			// Open the settings screen when the button is clicked
+			System.out.println("Settings button clicked!");
+//			minecraft.setScreenAndShow(new MineFabSettingsScreen(minecraft.screen));
+		});
+		settingsButton.setSize(44, 15);
+		settingsButton.setAnchor(InventoryTabWindow.Anchor.RIGHT);
+		settingsButton.setMargin(4);
+		settingsButton.setOffset(-48-50, 0); // nudged left of the Export button
+
+
 		// Buttons are windows too, so they use the same layout calls. The lambda runs when they are clicked.
-		InventoryTabWindowButton runButton = bottomWindow.addButton("Run", () -> System.out.println("Run button clicked!"));
+		InventoryTabWindowButton runButton = bottomWindow.addButton("Export", () -> System.out.println("Export button clicked!"));
 		runButton.setSize(44, 15);
 		runButton.setAnchor(InventoryTabWindow.Anchor.RIGHT); // right edge, centered vertically
 		runButton.setMargin(4);
 
-		InventoryTabWindowButton clearButton = bottomWindow.addButton("Clear", () -> System.out.println("Clear button clicked!"));
+		InventoryTabWindowButton clearButton = bottomWindow.addButton("Clear", this::clearBlockManager);
 		clearButton.setSize(44, 15);
 		clearButton.setAnchor(InventoryTabWindow.Anchor.RIGHT);
 		clearButton.setMargin(4);
-		clearButton.setOffset(-48, 0); // nudged left of the Run button
+		clearButton.setOffset(-48, 0); // nudged left of the Export button
 
 		// Set click listeners for the windows to log click events
 		topWindow.setClickListener((window, localX, localY, button) ->
@@ -96,5 +116,13 @@ public class MineCadClient implements ClientModInitializer {
 		System.out.println("MineCadClient initialized");
 
 
+	}
+
+	void clearBlockManager() {
+		// Clear the scanned blocks when the player logs out or disconnects from a server
+		ScannedBlockManager scannedBlockManager = MineCad.getScannedBlockManager();
+		if (scannedBlockManager != null) {
+			scannedBlockManager.deleteSelection();
+		}
 	}
 }

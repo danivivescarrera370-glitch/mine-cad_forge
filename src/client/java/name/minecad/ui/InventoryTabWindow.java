@@ -57,7 +57,7 @@ public class InventoryTabWindow {
   private final List<InventoryTabWindow> children = new ArrayList<>();
   private final String backgroundTextureFilePath;
   private int backgroundColor = DEFAULT_BACKGROUND_COLOR;
-  private Component title = Component.literal("MineCad");
+  private Component title = Component.empty();
 
   // Default position for children that have no anchor and no offset of their own.
   private int childOffsetX = DEFAULT_CHILD_OFFSET_X;
@@ -404,21 +404,24 @@ public class InventoryTabWindow {
   public void endMouseDrag(int button) {
   }
 
-  /**
-   * Called when the mouse wheel is scrolled over this window (it is the topmost window under the cursor).
-   * localX/localY are relative to this window. Return true if the scroll was used.
-   */
+  /** Called when the mouse wheel moves over this window. Return true if the scroll was used. */
   public boolean onMouseScroll(double localX, double localY, double horizontalAmount, double verticalAmount) {
     return false;
   }
 
-  /** Routes a scroll event to the topmost window under the cursor. Returns true if that window used it. */
-  public boolean dispatchScroll(int x, int y, double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+  /** Sends a scroll to the topmost window under the cursor that uses it, then to its ancestors. */
+  public boolean dispatchScroll(int x, int y, double mouseX, double mouseY,
+                                double horizontalAmount, double verticalAmount) {
     WindowHit hit = findWindowAt(x, y, mouseX, mouseY);
     if (hit == null) {
       return false;
     }
     return hit.window().onMouseScroll(mouseX - hit.x(), mouseY - hit.y(), horizontalAmount, verticalAmount);
+  }
+
+  /** Screen position of the target window (this window or a descendant), or null if it is not in this tree. */
+  public WindowHit locate(int rootX, int rootY, InventoryTabWindow target) {
+    return locateRecursive(rootX, rootY, target, 0);
   }
 
   /**
@@ -459,15 +462,6 @@ public class InventoryTabWindow {
   }
 
   private WindowHit locateRecursive(int x, int y, InventoryTabWindow target, int depth) {
-    return locateInternal(x, y, target, depth);
-  }
-
-  /** Absolute screen position of the target window (this window or a descendant), or null if not in this tree. */
-  public WindowHit locate(int rootX, int rootY, InventoryTabWindow target) {
-    return locateInternal(rootX, rootY, target, 0);
-  }
-
-  private WindowHit locateInternal(int x, int y, InventoryTabWindow target, int depth) {
     if (depth > MAX_NESTING_DEPTH) {
       return null;
     }

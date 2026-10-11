@@ -1,15 +1,21 @@
 package name.minecad.scannedblock;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 
 public class ScannedBlockManager {
-    private final List<ScannedBlock> scannedBlocks = new LinkedList<>();
+    private final Object lock = new Object();
+    private final List<ScannedBlock> scannedBlocks = new ArrayList<>();
+    private final Set<BlockPos> scannedPositions = new HashSet<>();
     private final int updateInterval;
     private int tickCounter = 0;
+    private long selectionRevision = 0;
 
     /**
      * Constructor that sets the update interval for automatic block state synchronization.
@@ -24,12 +30,14 @@ public class ScannedBlockManager {
      * Call this from your client tick event.
      */
     public void tick(Level world) {
-        if (world == null || scannedBlocks.isEmpty()) return;
+        synchronized (lock) {
+            if (world == null || scannedBlocks.isEmpty()) return;
 
-        tickCounter++;
-        if (tickCounter >= updateInterval) {
-            updateBlockStates(world);
-            tickCounter = 0; // Reset counter
+            tickCounter++;
+            if (tickCounter >= updateInterval) {
+                updateBlockStatesLocked(world);
+                tickCounter = 0; // Reset counter
+            }
         }
     }
 
@@ -41,22 +49,80 @@ public class ScannedBlockManager {
      * @return
      */
     public boolean addScannedBlock(Block block, BlockPos pos, Level world) {
+        return addScannedBlock(block, pos, world, true);
+    }
+
+    private boolean addScannedBlock(Block block, BlockPos pos, Level world, boolean logSelectionChange) {
         if (block == null || pos == null || world == null) {
-            System.out.println("Block, position, or world is null.");
+            if (logSelectionChange) {
+                System.out.println("Block, position, or world is null.");
+            }
             return false;
         }
-        boolean exists = scannedBlocks.stream().noneMatch(scannedBlock -> scannedBlock.pos.equals(pos));
-        if (!exists) {
-            System.out.println("Position already tracked: " + pos);
-            return false;
+        synchronized (lock) {
+            if (scannedPositions.contains(pos)) {
+                if (logSelectionChange) {
+                    System.out.println("Position already tracked: " + pos);
+                }
+                return false;
+            }
+            if (!doesBlockExist(block, pos, world)) {
+                return false;
+            }
+
+            scannedBlocks.add(new ScannedBlock(block, pos));
+            scannedPositions.add(pos);
+            selectionRevision++;
         }
-        if (!doesBlockExist(block, pos, world)) {
-            return false;
+        if (logSelectionChange) {
+            System.out.println("Block added: " + block.getName().getString() + " at location: " + pos);
+        }
+        return true;
+    }
+
+    public BulkAddResult addScannedBlocksInBounds(BlockPos firstPos, BlockPos secondPos, Level world) {
+        if (firstPos == null || secondPos == null || world == null) {
+            return new BulkAddResult(0, 0, 0, 0);
         }
 
-        scannedBlocks.add(new ScannedBlock(block, pos));
-        System.out.println("Block added: " + block.getName().getString() + " at location: " + pos);
-        return true;
+        int minX = Math.min(firstPos.getX(), secondPos.getX());
+        int minY = Math.min(firstPos.getY(), secondPos.getY());
+        int minZ = Math.min(firstPos.getZ(), secondPos.getZ());
+        int maxX = Math.max(firstPos.getX(), secondPos.getX());
+        int maxY = Math.max(firstPos.getY(), secondPos.getY());
+        int maxZ = Math.max(firstPos.getZ(), secondPos.getZ());
+
+        int added = 0;
+        int alreadyTracked = 0;
+        int skipped = 0;
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    BlockState blockState = world.getBlockState(pos);
+                    if (blockState.isAir()) {
+                        skipped++;
+                        continue;
+                    }
+
+                    if (addScannedBlock(blockState.getBlock(), pos, world, false)) {
+                        added++;
+                    } else {
+                        synchronized (lock) {
+                            if (scannedPositions.contains(pos)) {
+                                alreadyTracked++;
+                            } else {
+                                skipped++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        long requestedVolume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+        return new BulkAddResult(added, alreadyTracked, skipped, requestedVolume);
     }
 
     public boolean removeScannedBlock(Block block, BlockPos pos) {
@@ -64,7 +130,14 @@ public class ScannedBlockManager {
             System.out.println("Block or position is null.");
             return false;
         }
-        boolean removed = scannedBlocks.removeIf(scannedBlock -> scannedBlock.pos.equals(pos));
+        boolean removed;
+        synchronized (lock) {
+            removed = scannedBlocks.removeIf(scannedBlock -> scannedBlock.pos.equals(pos));
+            if (removed) {
+                scannedPositions.remove(pos);
+                selectionRevision++;
+            }
+        }
         if (removed) {
             System.out.println("Block removed: " + block.getName().getString() + " at location: " + pos);
         } else {
@@ -78,6 +151,12 @@ public class ScannedBlockManager {
      * This should be called periodically to keep the list synchronized.
      */
     public void updateBlockStates(Level world) {
+        synchronized (lock) {
+            updateBlockStatesLocked(world);
+        }
+    }
+
+    private void updateBlockStatesLocked(Level world) {
         if (world == null) return;
 
         for (int i = 0; i < scannedBlocks.size(); i++) {
@@ -91,6 +170,7 @@ public class ScannedBlockManager {
 
                 // Replace with updated block
                 scannedBlocks.set(i, new ScannedBlock(currentBlock, scannedBlock.pos));
+                selectionRevision++;
             }
         }
     }
@@ -101,16 +181,19 @@ public class ScannedBlockManager {
     public boolean updateBlockState(BlockPos pos, Level world) {
         if (pos == null || world == null) return false;
 
-        for (int i = 0; i < scannedBlocks.size(); i++) {
-            ScannedBlock scannedBlock = scannedBlocks.get(i);
-            if (scannedBlock.pos.equals(pos)) {
-                Block currentBlock = world.getBlockState(pos).getBlock();
-                if (!scannedBlock.block.equals(currentBlock)) {
-                    scannedBlocks.set(i, new ScannedBlock(currentBlock, pos));
-                    System.out.println("Updated block at " + pos + " to " + currentBlock.getName().getString());
-                    return true;
+        synchronized (lock) {
+            for (int i = 0; i < scannedBlocks.size(); i++) {
+                ScannedBlock scannedBlock = scannedBlocks.get(i);
+                if (scannedBlock.pos.equals(pos)) {
+                    Block currentBlock = world.getBlockState(pos).getBlock();
+                    if (!scannedBlock.block.equals(currentBlock)) {
+                        scannedBlocks.set(i, new ScannedBlock(currentBlock, pos));
+                        selectionRevision++;
+                        System.out.println("Updated block at " + pos + " to " + currentBlock.getName().getString());
+                        return true;
+                    }
+                    break;
                 }
-                break;
             }
         }
         return false;
@@ -120,7 +203,9 @@ public class ScannedBlockManager {
      * Gets all currently tracked blocks.
      */
     public List<ScannedBlock> getScannedBlocks() {
-        return new LinkedList<>(scannedBlocks);
+        synchronized (lock) {
+            return new ArrayList<>(scannedBlocks);
+        }
     }
 
     /**
@@ -130,16 +215,34 @@ public class ScannedBlockManager {
         return updateInterval;
     }
 
+    /** Increases every time the set of selected blocks (or one of their block types) changes. */
+    public long getSelectionRevision() {
+        synchronized (lock) {
+            return selectionRevision;
+        }
+    }
+
     public void deleteSelection() {
-        scannedBlocks.clear();
+        synchronized (lock) {
+            if (!scannedBlocks.isEmpty()) {
+                selectionRevision++;
+            }
+            scannedBlocks.clear();
+            scannedPositions.clear();
+        }
     }
 
     public long getSelectionCount() {
-        return this.scannedBlocks.size();
+        synchronized (lock) {
+            return this.scannedBlocks.size();
+        }
     }
 
     private boolean doesBlockExist(Block block, BlockPos pos, Level world) {
         if (world == null || pos == null || block == null) return false;
         return world.hasChunkAt(pos) && world.getBlockState(pos).getBlock().equals(block);
+    }
+
+    public record BulkAddResult(int addedCount, int alreadyTrackedCount, int skippedCount, long requestedVolume) {
     }
 }

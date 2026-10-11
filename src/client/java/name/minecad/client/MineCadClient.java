@@ -5,6 +5,8 @@ import name.minecad.client.render.SelectionOutlineRenderer;
 import name.minecad.ui.InventoryTab;
 import name.minecad.ui.InventoryTabManager;
 import name.minecad.ui.InventoryTabWindow;
+import name.minecad.ui.InventoryTabWindow3DRenderer;
+import name.minecad.ui.InventoryTabWindowButton;
 import name.minecad.ui.MineFabSettings;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -43,19 +45,32 @@ public class MineCadClient implements ClientModInitializer {
 		mainWindow.setPadding(4); // keeps children away from the main window edges
 
 		// Two windows inside the main window: a top one and a bottom one, each half of the usable height.
-		InventoryTabWindow topWindow = mainWindow.addChild(new InventoryTabWindow(100, 50));
+		InventoryTabWindow topWindow = mainWindow.addChild(new InventoryTabWindow3DRenderer(100, 50));
 		topWindow.setTitle(Component.literal("3D"));
 		topWindow.setBackgroundColor(0xFFFFFFFF);
+		((InventoryTabWindow3DRenderer) topWindow).setRenderScalePercent(0.40);
 		topWindow.setAnchor(InventoryTabWindow.Anchor.TOP);
 		topWindow.setMargin(2); // space around the window
-		topWindow.setRelativeSize(1.0, 0.85); // scales with the inventory in survival/creative/etc.c.
+		topWindow.setRelativeSize(1.0, 0.78); // scales with the inventory in survival/creative/etc.
 
 		InventoryTabWindow bottomWindow = mainWindow.addChild(new InventoryTabWindow(100, 10));
 		bottomWindow.setTitle(Component.literal("Inspector"));
 		bottomWindow.setBackgroundColor(0xFFECECEC);
 		bottomWindow.setAnchor(InventoryTabWindow.Anchor.BOTTOM);
 		bottomWindow.setMargin(2);
-		bottomWindow.setRelativeSize(1.0, .15); // scales with the inventory in survival/creative/etc.
+		bottomWindow.setRelativeSize(1.0, 0.22); // scales with the inventory in survival/creative/etc.
+
+		// Buttons are windows too, so they use the same layout calls. The lambda runs when they are clicked.
+		InventoryTabWindowButton runButton = bottomWindow.addButton("Run", () -> System.out.println("Run button clicked!"));
+		runButton.setSize(44, 15);
+		runButton.setAnchor(InventoryTabWindow.Anchor.RIGHT); // right edge, centered vertically
+		runButton.setMargin(4);
+
+		InventoryTabWindowButton clearButton = bottomWindow.addButton("Clear", () -> System.out.println("Clear button clicked!"));
+		clearButton.setSize(44, 15);
+		clearButton.setAnchor(InventoryTabWindow.Anchor.RIGHT);
+		clearButton.setMargin(4);
+		clearButton.setOffset(-48, 0); // nudged left of the Run button
 
 		// Set click listeners for the windows to log click events
 		topWindow.setClickListener((window, localX, localY, button) ->

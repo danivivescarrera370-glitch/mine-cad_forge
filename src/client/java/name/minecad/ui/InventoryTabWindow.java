@@ -117,11 +117,49 @@ public class InventoryTabWindow {
     this.height = height;
   }
 
+  public int getWidth() {
+
+    return width;
+
+  }
+
+
+
+  public int getHeight() {
+
+    return height;
+
+  }
+
+
+
   public String getBackgroundTextureFilePath() {
     return backgroundTextureFilePath;
   }
 
   // ---------------------------------------------------------------- hierarchy
+
+  /**
+
+   * Creates a button, adds it as a child of this window and returns it so it can be positioned
+
+   * with the usual layout calls (setAnchor, setMargin, setOffset, setRelativeSize, centerWindow...).
+
+   * The action runs whenever the button is left-clicked.
+
+   */
+
+  public InventoryTabWindowButton addButton(String label, Runnable action) {
+
+    InventoryTabWindowButton button = new InventoryTabWindowButton(Component.literal(label), action);
+
+    addChild(button);
+
+    return button;
+
+  }
+
+
 
   /** Adds a child window (several children are allowed, e.g. a top and a bottom window). Returns the child. */
   public InventoryTabWindow addChild(InventoryTabWindow child) {
@@ -299,23 +337,38 @@ public class InventoryTabWindow {
   // ---------------------------------------------------------------- drawing
 
   public void drawWindow(GuiGraphicsExtractor graphics, Font font, int x, int y) {
-    drawWindowRecursive(graphics, font, x, y, 0);
+
+    drawWindowRecursive(graphics, font, x, y, -1, -1, 0);
+
   }
 
-  private void drawWindowRecursive(GuiGraphicsExtractor graphics, Font font, int x, int y, int depth) {
+
+
+  /** Draws the window tree; the mouse position lets children (such as buttons) show hover effects. */
+
+  public void drawWindow(GuiGraphicsExtractor graphics, Font font, int x, int y, int mouseX, int mouseY) {
+
+    drawWindowRecursive(graphics, font, x, y, mouseX, mouseY, 0);
+
+  }
+
+
+
+  private void drawWindowRecursive(GuiGraphicsExtractor graphics, Font font, int x, int y, int mouseX, int mouseY, int depth) {
     if (depth > MAX_NESTING_DEPTH) {
       return;
     }
 
-    drawSelf(graphics, font, x, y);
+    drawSelf(graphics, font, x, y, mouseX, mouseY);
 
     for (InventoryTabWindow child : children) {
       child.applyRelativeSize(this);
-      child.drawWindowRecursive(graphics, font, x + resolveChildX(child), y + resolveChildY(child), depth + 1);
+      child.drawWindowRecursive(graphics, font, x + resolveChildX(child), y + resolveChildY(child), mouseX, mouseY, depth + 1);
     }
   }
 
-  private void drawSelf(GuiGraphicsExtractor graphics, Font font, int x, int y) {
+  /** Draws just this window. Subclasses (such as buttons) override this to change how they look. */
+  protected void drawSelf(GuiGraphicsExtractor graphics, Font font, int x, int y, int mouseX, int mouseY) {
     graphics.fill(x, y, x + width, y + height, BORDER_COLOR);
     graphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, backgroundColor);
     graphics.fill(x + 2, y + 2, x + width - 2, y + 3, HIGHLIGHT_COLOR);
@@ -336,6 +389,36 @@ public class InventoryTabWindow {
 
   public void setClickListener(ClickListener listener) {
     this.clickListener = listener;
+  }
+
+  /** Called when a mouse button is pressed on this window. Return true to capture drag events. */
+  public boolean beginMouseDrag(int button) {
+    return false;
+  }
+
+  /** Called while a captured drag is in progress. localX/localY are relative to this window. */
+  public void onMouseDrag(double localX, double localY, double deltaX, double deltaY, int button) {
+  }
+
+  /** Called when a captured drag ends. */
+  public void endMouseDrag(int button) {
+  }
+
+  /**
+   * Called when the mouse wheel is scrolled over this window (it is the topmost window under the cursor).
+   * localX/localY are relative to this window. Return true if the scroll was used.
+   */
+  public boolean onMouseScroll(double localX, double localY, double horizontalAmount, double verticalAmount) {
+    return false;
+  }
+
+  /** Routes a scroll event to the topmost window under the cursor. Returns true if that window used it. */
+  public boolean dispatchScroll(int x, int y, double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+    WindowHit hit = findWindowAt(x, y, mouseX, mouseY);
+    if (hit == null) {
+      return false;
+    }
+    return hit.window().onMouseScroll(mouseX - hit.x(), mouseY - hit.y(), horizontalAmount, verticalAmount);
   }
 
   /**
@@ -376,6 +459,15 @@ public class InventoryTabWindow {
   }
 
   private WindowHit locateRecursive(int x, int y, InventoryTabWindow target, int depth) {
+    return locateInternal(x, y, target, depth);
+  }
+
+  /** Absolute screen position of the target window (this window or a descendant), or null if not in this tree. */
+  public WindowHit locate(int rootX, int rootY, InventoryTabWindow target) {
+    return locateInternal(rootX, rootY, target, 0);
+  }
+
+  private WindowHit locateInternal(int x, int y, InventoryTabWindow target, int depth) {
     if (depth > MAX_NESTING_DEPTH) {
       return null;
     }

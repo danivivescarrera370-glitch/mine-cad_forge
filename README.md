@@ -28,7 +28,7 @@ and then within the `Selection Settings` of the `3D Tab`, select `Fill Scan`. `F
 ![MineCAD preview step 2](src/images/step_2_example.png)
 ![MineCAD preview step 3](src/images/step_3_example.png)
 
-Here is an example of a 1m² block in Blender compared to our exported object that also has a 1m² relative block size.
+Here is an example of a 1m³ sized block in Blender compared to our exported object that also has a 1m³ relative block size.
 ![1 meter comparison in Blender](src/images/1m_comparison_blender.png)
 
 ## Requirements

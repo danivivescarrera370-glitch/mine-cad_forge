@@ -25,10 +25,10 @@ Using MineCAD is relatively simple, while there are a variety of ways to make a 
 With the `Wand Tool` you can either individually select all the blocks you want to add, or you can highlight the edges and corners of the entire body of the selection that you want to add,
 and then within the `Selection Settings` of the `3D Tab`, select `Fill Scan`. `Fill Scan` will calculate the volume between the selected points and add every block within that volume.
 
-(Thanks to [Claire1593 on Planet Minecraft](https://www.planetminecraft.com/project/dexter-s-laboratory-house-schematic/) for providing the Dexter's Laboratory House world example I used!) 
 ![MineCAD preview step 1](src/images/step_1_example.png)
 ![MineCAD preview step 2](src/images/step_2_example.png)
 ![MineCAD preview step 3](src/images/step_3_example.png)
+<sub>(Dexter's Laboratory House by [Claire1593](https://www.planetminecraft.com/project/dexter-s-laboratory-house-schematic/))</sub>
 
 Here is an example of a 1m³ sized block in Blender compared to our exported object that also has a 1m³ relative block size.
 ![1 meter comparison in Blender](src/images/1m_comparison_blender.png)

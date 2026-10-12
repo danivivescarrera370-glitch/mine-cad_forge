@@ -32,11 +32,6 @@ public class MineCadClient implements ClientModInitializer {
 
 	// privates for all the stuff we will need in the GUI.
 	private InventoryTabWindow3DRenderer view3dPane;
-	private InventoryTabTextPanel selectionPane;
-	private InventoryTabTextPanel settingsPane;
-	private InventoryTabTextPanel savesPane;
-	private InventoryTabTextPanel helpPane;
-	private InventoryTabTextPanel infoPane;
 
 	public static void setAdditionalTabsOffset(int xOffset, int yOffset) {
 		pendingTabsOffsetX = xOffset;
@@ -306,9 +301,6 @@ public class MineCadClient implements ClientModInitializer {
 		infoButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(infoButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
-
-
-
 		/** End Buttons and Input Fields for 3D additional settings */
 
 
@@ -327,39 +319,6 @@ public class MineCadClient implements ClientModInitializer {
 		});
 		/** END 3D VIEW TAB */
 
-
-
-
-//		/** SELECTION TAB */
-//		InventoryTabTextPanel selectionPane = new InventoryTabTextPanel(100, 100, Component.literal("Selection"));
-//		selectionPane.setScrollbarSize(TEXT_PANEL_SCROLLBAR_SIZE);
-//		selectionPane.setStyledLines(List.of(
-//				InventoryTabTextPanel.line("Outline rendering:", 0xFF2E2E2E, 1.0F),
-//				InventoryTabTextPanel.line("- Enabled: " + MineFabSettings.areOutlinesEnabled(), 0xFF404040, 1.0F),
-//				InventoryTabTextPanel.line("- Hovered: " + MineFabSettings.isHoveredOutlineEnabled(), 0xFF404040, 1.0F),
-//				InventoryTabTextPanel.line("- Stroke: " + MineFabSettings.getOutlineStrokeWidth(), 0xFF404040, 1.0F)
-//		));
-//
-//		// clear selection button
-//		InventoryTabWindowButton clearSelectionSelectionButton = selectionPane.addButton("Clear Selection", () -> MineCad.getScannedBlockManager().deleteSelection());
-//		clearSelectionSelectionButton.setAnchor(InventoryTabWindow.Anchor.BOTTOM_LEFT);
-//		clearSelectionSelectionButton.setMargin(6);
-//
-//		// Export selection button
-//		InventoryTabWindowButton exportSelectionButton = selectionPane.addButton("Export Selection", () -> {
-//			// TODO: Implement logic for exporting the block selection to various formats (e.g., OBJ, STL, etc.) or to other mods/tools.
-//		});
-//		exportSelectionButton.setAnchor(InventoryTabWindow.Anchor.BOTTOM_RIGHT);
-//		exportSelectionButton.setMargin(6);
-//
-//		selectionPane.setOnTabSelected(() -> {
-//			System.out.println("Settings tab selected.");
-//			additionalSettingsPane.setVisible(true);
-//
-//			// render the additional settings for this particular selection
-//			// TODO: Implement logic to update the additionalSettingsPane with selection-specific settings when the selection tab is selected.
-//		});
-//		/** END SELECTION TAB */
 
 		/** SETTINGS TAB */
 		ScrollableControlPane settingsPane = new ScrollableControlPane(100, 100, Component.literal("Settings"));

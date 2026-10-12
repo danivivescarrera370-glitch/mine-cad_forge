@@ -91,5 +91,5 @@ Expect iteration on UI polish, settings UX, and docs over time.
 
 ## License
 
-This repository is licensed under **CC0 1.0 Universal**.
+This repository is licensed under **MIT**.
 See `LICENSE` for full text.

@@ -3,8 +3,8 @@
 MineCad is an early access Fabric mod that turns Minecraft into a lightweight in-game CAD workflow.
 It's designed to help people without the skills needed for advanced 3D modeling software to create sophisticated 3D Models with Minecraft. 
 
-In MineCad you can adjust a block's scale. Typically, in Minecraft 1 block = 1 meter. Well in MineCad, this is dynamic and can be changed. 
-1 Block could equal 0.1 Meters, 0.01 Meters, etc., etc. So with enough patience and ingenuity, this can allow for the creation of complicated 3D models all within Minecraft. 
+In MineCad you can adjust a block's scale. Typically, in Minecraft 1 block = 1 meter². Well in MineCad, this is dynamic and can be changed. 
+1 Block could equal 0.1 Meter², 0.01 Meter², etc., etc. So with enough patience and ingenuity, this can allow for the creation of complicated 3D models all within Minecraft. 
 
 MineCad can of course also be used to export regular builds to the variety of 3D files. 
 
@@ -26,7 +26,7 @@ and then within the `Selection Settings` of the `3D Tab`, select `Fill Scan`. `F
 ![MineCad preview step 2](src/images/step_2_example.png)
 ![MineCad preview step 3](src/images/step_3_example.png)
 
-Here is an example of a 1m² block in blender compared to our exported object that also has a 1m² relative block size.
+Here is an example of a 1m² block in Blender compared to our exported object that also has a 1m² relative block size.
 ![1 meter comparison in Blender](src/images/1m_comparison_blender.png)
 
 ## Requirements

@@ -1,14 +1,14 @@
-# MineCad
+# MineCAD
 
-MineCad is an early access Fabric mod that turns Minecraft into a lightweight, in-game CAD workflow.
+MineCAD is an early access Fabric mod that turns Minecraft into a lightweight, in-game CAD workflow.
 
-This project started from a simple goal: make 3D modeling more accessible to people who do not have experience with advanced modeling software. If you can build in Minecraft, you can start modeling with MineCad.
+This project started from a simple goal: make 3D modeling more accessible to people who do not have experience with advanced modeling software. If you can build in Minecraft, you can start modeling with MineCAD.
 
-In Minecraft, a block is usually treated as a `1m x 1m x 1m` cube. MineCad makes that scale dynamic. Instead of 1 block always representing 1 meter, it can represent `0.1` meters, `0.01` meters, or other values.
+In Minecraft, a block is usually treated as a `1m x 1m x 1m` cube. MineCAD makes that scale dynamic. Instead of 1 block always representing 1 meter, it can represent `0.1` meters, `0.01` meters, or other values.
 
 That means you can build with much larger detail in-game, then scale the model down during export to preserve finer features and relative dimensions.
 
-MineCad also supports direct export to `STL`, `OBJ`, and `FBX`, so creations built entirely in Minecraft can move into traditional 3D workflows and 3D printing pipelines.
+MineCAD also supports direct export to `STL`, `OBJ`, and `FBX`, so creations built entirely in Minecraft can move into traditional 3D workflows and 3D printing pipelines.
 
 ## Features
 
@@ -20,13 +20,13 @@ MineCad also supports direct export to `STL`, `OBJ`, and `FBX`, so creations bui
 - Scale control for export units (`selection scale`)
 
 
-## Using MineCad
-Using MineCad is relatively simple, while there are a variety of ways to make a block selection, the simplest of ways is to use the `Wand Tool`.
+## Using MineCAD
+Using MineCAD is relatively simple, while there are a variety of ways to make a block selection, the simplest of ways is to use the `Wand Tool`.
 With the `Wand Tool` you can either individually select all the blocks you want to add, or you can highlight the edges and corners of the entire body of the selection that you want to add,
 and then within the `Selection Settings` of the `3D Tab`, select `Fill Scan`. `Fill Scan` will calculate the volume between the selected points and add every block within that volume.
-![MineCad preview step 1](src/images/step_1_example.png)
-![MineCad preview step 2](src/images/step_2_example.png)
-![MineCad preview step 3](src/images/step_3_example.png)
+![MineCAD preview step 1](src/images/step_1_example.png)
+![MineCAD preview step 2](src/images/step_2_example.png)
+![MineCAD preview step 3](src/images/step_3_example.png)
 
 Here is an example of a 1m² block in Blender compared to our exported object that also has a 1m² relative block size.
 ![1 meter comparison in Blender](src/images/1m_comparison_blender.png)
@@ -56,7 +56,7 @@ Set-Location "C:\Java Projects\mine-cad"
 
 ## In-Game UI
 
-MineCad is integrated into the player inventory via a custom tab.
+MineCAD is integrated into the player inventory via a custom tab.
 
 - **3D tab**: inspect selected blocks in a preview scene
 - **Settings tab**: tweak mod behavior and keybind strings
@@ -105,7 +105,7 @@ Examples:
 
 ## Status
 
-MineCad is still in early access. There are more features planned, and there are likely bugs to resolve as development continues.
+MineCAD is still in early access. There are more features planned, and there are likely bugs to resolve as development continues.
 That said, the project is now in a state where it is ready to share publicly and iterate in the open.
 
 ## License

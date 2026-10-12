@@ -255,7 +255,9 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
       }
     }
     renderScene(graphics, x, y);
-    drawStatusText(graphics, font, x, y);
+
+    // disable this for now.
+//    drawStatusText(graphics, font, x, y);
   }
 
   private void drawStatusText(GuiGraphicsExtractor graphics, Font font, int x, int y) {

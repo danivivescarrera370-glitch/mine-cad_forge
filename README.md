@@ -1,7 +1,12 @@
 # MineCad
 
-MineCad is a Fabric mod that turns Minecraft into a lightweight in-game CAD workflow.
-It lets you select blocks, preview them in a 3D viewport, and export selections to common 3D formats.
+MineCad is an early access Fabric mod that turns Minecraft into a lightweight in-game CAD workflow.
+It's designed to help people without the skills needed for advanced 3D modeling software to create sophisticated 3D Models with Minecraft. 
+
+In MineCad you can adjust a block's scale. Typically, in Minecraft 1 block = 1 meter. Well in MineCad, this is dynamic and can be changed. 
+1 Block could equal 0.1 Meters, 0.01 Meters, etc., etc. So with enough patience and ingenuity, this can allow for the creation of complicated 3D models all within Minecraft. 
+
+MineCad can of course also be used to export regular builds to the variety of 3D files. 
 
 ## Features
 
@@ -11,6 +16,18 @@ It lets you select blocks, preview them in a 3D viewport, and export selections 
 - Export support for `STL`, `OBJ`, and `FBX`
 - Configurable settings UI (including keybind capture fields)
 - Scale control for export units (`selection scale`)
+
+
+## Using MineCad
+Using MineCad is relatively simple, while there are a variety of ways to make a block selection, the simplest of ways is to use the wand tool.
+With the wand tool you can either individually select all the blocks you want to add, or you can highlight the edges and corners of the entire body of the selection that you want to add,
+and then within the Selection Settings of the 3D Tab, select Fill Scan. Fill Scan will calculate the volume between the selected points and add every block within that volume.
+<img src="images/step_1_example.png" alt="MineCad preview step 1" width="700" />
+<img src="images/step_2_example.png" alt="MineCad preview step 2" width="700" />
+<img src="images/step_2_example.png" alt="MineCad preview step 2" width="700" />
+
+Here is an example of a 1m² block in blender compared to our exported object that also has a 1m² relative block size.
+<img src="images/1m_comparison_blender.png" alt="1 meter comparison in Blender" width="700" />
 
 ## Requirements
 

@@ -98,7 +98,8 @@ public final class SelectionOutlineRenderer {
     }
 
     private static void ensureSelectionGizmosUpToDate(ScannedBlockManager manager) {
-        long revision = manager.getSelectionRevision();
+        // Outlines depend on block positions only, so state changes (doors, plates, ...) must not rebuild them.
+        long revision = manager.getStructureRevision();
         int outlineColor = MineFabSettings.getSelectedOutlineColor();
         float strokeWidth = MineFabSettings.getOutlineStrokeWidth();
         if (revision == cachedRevision

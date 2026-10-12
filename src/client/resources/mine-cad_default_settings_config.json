@@ -17,7 +17,9 @@
         "mouse_acceleration_factor": 1.0,
         "camera_speed": 1.0,
         "camera_acceleration_enabled": true,
-        "camera_acceleration_factor": 1.0
+        "camera_acceleration_factor": 1.0,
+        "max_render_blocks": 100000,
+        "interactive_render_blocks": 25000
       },
 
       "keybinds":

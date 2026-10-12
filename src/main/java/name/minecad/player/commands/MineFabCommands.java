@@ -124,6 +124,16 @@ public class MineFabCommands {
                         .then(Commands.literal("outlines")
                                 .then(Commands.argument("enabled", StringArgumentType.word())
                                         .executes(MineFabCommands::setOutlinesEnabledFromSettings)))
+                        .then(Commands.literal("maxrenderblocks")
+                                .executes(MineFabCommands::showMaxRenderBlocks)
+                                .then(Commands.argument("blocks",
+                                                IntegerArgumentType.integer(MineFabSettings.getMinMaxRenderBlocks(), MineFabSettings.getMaxMaxRenderBlocks()))
+                                        .executes(MineFabCommands::setMaxRenderBlocks)))
+                        .then(Commands.literal("interactiverenderblocks")
+                                .executes(MineFabCommands::showInteractiveRenderBlocks)
+                                .then(Commands.argument("blocks",
+                                                IntegerArgumentType.integer(MineFabSettings.getMinMaxRenderBlocks(), MineFabSettings.getMaxMaxRenderBlocks()))
+                                        .executes(MineFabCommands::setInteractiveRenderBlocks)))
                         .then(Commands.literal("outlinecolor")
                                 .then(Commands.argument("color", StringArgumentType.word())
                                         .executes(MineFabCommands::setOutlineColorFromSettings)))
@@ -309,6 +319,38 @@ public class MineFabCommands {
         return 1;
     }
 
+    private static int showMaxRenderBlocks(CommandContext<CommandSourceStack> context) {
+        int max = MineFabSettings.getMaxRenderBlocks();
+        context.getSource().sendSuccess(() -> Component.literal(
+                "3D viewport max render blocks: " + max), false);
+        return 1;
+    }
+
+    private static int setMaxRenderBlocks(CommandContext<CommandSourceStack> context) {
+        int requested = IntegerArgumentType.getInteger(context, "blocks");
+        MineFabSettings.setMaxRenderBlocks(requested);
+        int applied = MineFabSettings.getMaxRenderBlocks();
+        context.getSource().sendSuccess(() -> Component.literal(
+                "3D viewport max render blocks set to " + applied), false);
+        return 1;
+    }
+
+    private static int showInteractiveRenderBlocks(CommandContext<CommandSourceStack> context) {
+        int max = MineFabSettings.getInteractiveRenderBlocks();
+        context.getSource().sendSuccess(() -> Component.literal(
+                "3D viewport interactive render blocks: " + max), false);
+        return 1;
+    }
+
+    private static int setInteractiveRenderBlocks(CommandContext<CommandSourceStack> context) {
+        int requested = IntegerArgumentType.getInteger(context, "blocks");
+        MineFabSettings.setInteractiveRenderBlocks(requested);
+        int applied = MineFabSettings.getInteractiveRenderBlocks();
+        context.getSource().sendSuccess(() -> Component.literal(
+                "3D viewport interactive render blocks set to " + applied), false);
+        return 1;
+    }
+
     private static int wandInfo(CommandContext<CommandSourceStack> context) {
         if (wandManager == null) {
             context.getSource().sendFailure(Component.literal("WandManager not initialized"));
@@ -354,6 +396,8 @@ public class MineFabCommands {
                         "/minecad settings reset - Reset settings to defaults\n" +
                         "/minecad settings scale [metersPerBlock] - Show or set export scale\n" +
                         "/minecad settings outlines <on|off> - Enable/disable selection outlines\n" +
+                        "/minecad settings maxrenderblocks [blocks] - Show or set the max blocks drawn in the 3D viewport\n" +
+                        "/minecad settings interactiverenderblocks [blocks] - Show or set how many blocks are drawn while the 3D view is moving\n" +
                         "/minecad settings outlinecolor <hex> - Set outline color\n" +
                         "/minecad settings outlinethickness <width> - Set outline thickness\n" +
                         "/minecad wand info - Show wand information\n" +
@@ -394,6 +438,8 @@ public class MineFabCommands {
                         + "- 3d_viewport_settings.camera_speed\n"
                         + "- 3d_viewport_settings.camera_acceleration_enabled\n"
                         + "- 3d_viewport_settings.camera_acceleration_factor\n"
+                        + "- 3d_viewport_settings.max_render_blocks\n"
+                        + "- 3d_viewport_settings.interactive_render_blocks\n"
                         + "- keybinds.toggle_outline\n"
                         + "- keybinds.3d_viewport_camera_rotation\n"
                         + "- keybinds.3d_viewport_camera_zoom\n"
@@ -615,6 +661,8 @@ public class MineFabCommands {
                 + "- Camera speed: " + MineFabSettings.formatNumber(MineFabSettings.getCameraSpeed()) + "\n"
                 + "- Camera acceleration: " + MineFabSettings.isCameraAccelerationEnabled() + " (factor "
                 + MineFabSettings.formatNumber(MineFabSettings.getCameraAccelerationFactor()) + ")\n"
+                + "- Max render blocks: " + MineFabSettings.getMaxRenderBlocks() + "\n"
+                + "- Interactive render blocks: " + MineFabSettings.getInteractiveRenderBlocks() + "\n"
                 + "- Wand enabled: " + MineFabSettings.isWandEnabled() + "\n"
                 + "- Wand default item: " + MineFabSettings.getWandDefaultItem();
     }

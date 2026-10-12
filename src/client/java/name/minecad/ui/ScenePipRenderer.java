@@ -46,6 +46,15 @@ public class ScenePipRenderer extends PictureInPictureRenderer<ScenePipRenderSta
     float pixelsPerUnit = poseStack.last().pose().getScale(new Vector3f()).x();
     float depthSquash = Math.min(1.0f, MAX_DEPTH_EXTENT / (1.8f * Math.max(pixelsPerUnit, 1.0f)));
 
+    // The base pose already contains the translation to the picture centre (texture pixels, origin
+    // top-left), so projected block positions are measured against that centre, not against zero.
+    // The picture is (x1 - x0) x (y1 - y0) GUI pixels, drawn at guiScale times that size.
+    // The pose scale is guiScale * state.scale(), which gives guiScale back.
+    Vector3f viewCenter = poseStack.last().pose().getTranslation(new Vector3f());
+    float guiScale = state.scale() > 0.0f ? pixelsPerUnit / state.scale() : 1.0f;
+    float viewHalfWidth = (state.x1() - state.x0()) * guiScale * 0.5f;
+    float viewHalfHeight = (state.y1() - state.y0()) * guiScale * 0.5f;
+
     // View offset (moved with WASD) in unit-sized preview space; view y points up, pose y points down.
     poseStack.translate(state.offsetX(), -state.offsetY(), 0.0f);
     // Only affects depth ordering (keeps large zoom inside the depth range).
@@ -54,7 +63,8 @@ public class ScenePipRenderer extends PictureInPictureRenderer<ScenePipRenderSta
     float normalize = (float) scene.normalizeScale();
     poseStack.scale(normalize, normalize, normalize);
 
-    scene.submit(poseStack, collector);
+    scene.submit(poseStack, collector, viewCenter.x(), viewCenter.y(), viewHalfWidth, viewHalfHeight,
+        state.yawDegrees(), state.pitchDegrees(), state.blockBudget());
   }
 
   /**

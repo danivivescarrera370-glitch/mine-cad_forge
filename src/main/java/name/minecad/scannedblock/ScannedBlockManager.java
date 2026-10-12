@@ -19,6 +19,8 @@ public class ScannedBlockManager {
     private final int updateInterval;
     private int tickCounter = 0;
     private long selectionRevision = 0;
+    /** Changes only when blocks are added to / removed from the selection (not when a block's state changes). */
+    private long structureRevision = 0;
 
     /**
      * Constructor that sets the update interval for automatic block state synchronization.
@@ -77,6 +79,7 @@ public class ScannedBlockManager {
             scannedPositions.add(pos);
             scannedStates.put(pos, world.getBlockState(pos));
             selectionRevision++;
+            structureRevision++;
         }
         if (logSelectionChange) {
             System.out.println("Block added: " + block.getName().getString() + " at location: " + pos);
@@ -141,6 +144,7 @@ public class ScannedBlockManager {
                 scannedPositions.remove(pos);
                 scannedStates.remove(pos);
                 selectionRevision++;
+                structureRevision++;
             }
         }
         if (removed) {
@@ -172,10 +176,9 @@ public class ScannedBlockManager {
             // State changes (e.g. stair shape/facing) must also trigger a rebuild.
             if (previousState == null || !previousState.equals(currentState)) {
                 Block currentBlock = currentState.getBlock();
-                System.out.println("Block state changed at " + scannedBlock.pos + ": " +
-                        scannedBlock.block.getName().getString() + " -> " + currentBlock.getName().getString());
 
-                // Replace with updated block
+                // Replace with updated block (no per-block logging: hundreds of redstone-like
+                // blocks can flip every second and printing each one stalls the game).
                 scannedBlocks.set(i, new ScannedBlock(currentBlock, scannedBlock.pos));
                 scannedStates.put(scannedBlock.pos, currentState);
                 selectionRevision++;
@@ -233,10 +236,18 @@ public class ScannedBlockManager {
         }
     }
 
+    /** Increases only when blocks are added to or removed from the selection. */
+    public long getStructureRevision() {
+        synchronized (lock) {
+            return structureRevision;
+        }
+    }
+
     public void deleteSelection() {
         synchronized (lock) {
             if (!scannedBlocks.isEmpty()) {
                 selectionRevision++;
+                structureRevision++;
             }
             scannedBlocks.clear();
             scannedPositions.clear();

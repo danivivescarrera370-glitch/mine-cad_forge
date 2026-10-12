@@ -24,6 +24,10 @@ public class MineFabSettings {
 	private static final double MAX_METERS_PER_BLOCK = 1_000_000D;
 	private static final float MIN_STROKE_WIDTH = 0.5F;
 	private static final float MAX_STROKE_WIDTH = 8.0F;
+	private static final int DEFAULT_MAX_RENDER_BLOCKS = 100_000;
+	private static final int MIN_MAX_RENDER_BLOCKS = 1;
+	private static final int MAX_MAX_RENDER_BLOCKS = 5_000_000;
+	private static final int DEFAULT_INTERACTIVE_RENDER_BLOCKS = 25_000;
 
 	private static final String DEFAULT_MEASUREMENT_UNIT = "meters";
 	private static final int DEFAULT_OUTLINE_COLOR = 0xFFFF0000;
@@ -46,6 +50,8 @@ public class MineFabSettings {
 	private double cameraSpeed = DEFAULT_FACTOR;
 	private boolean cameraAccelerationEnabled = true;
 	private double cameraAccelerationFactor = DEFAULT_FACTOR;
+	private int maxRenderBlocks = DEFAULT_MAX_RENDER_BLOCKS;
+	private int interactiveRenderBlocks = DEFAULT_INTERACTIVE_RENDER_BLOCKS;
 
 	private String keybindToggleOutline = "O";
 	private String keybindCameraRotation = "MOUSE_SCROLL_CLICK";
@@ -197,6 +203,32 @@ public class MineFabSettings {
 		return active.cameraAccelerationFactor;
 	}
 
+	public static synchronized int getMaxRenderBlocks() {
+		return active.maxRenderBlocks;
+	}
+
+	public static synchronized void setMaxRenderBlocks(int maxRenderBlocks) {
+		active.maxRenderBlocks = clampMaxRenderBlocks(maxRenderBlocks);
+		save();
+	}
+
+	public static int getMinMaxRenderBlocks() {
+		return MIN_MAX_RENDER_BLOCKS;
+	}
+
+	public static int getMaxMaxRenderBlocks() {
+		return MAX_MAX_RENDER_BLOCKS;
+	}
+
+	public static synchronized int getInteractiveRenderBlocks() {
+		return active.interactiveRenderBlocks;
+	}
+
+	public static synchronized void setInteractiveRenderBlocks(int interactiveRenderBlocks) {
+		active.interactiveRenderBlocks = clampMaxRenderBlocks(interactiveRenderBlocks);
+		save();
+	}
+
 	public static synchronized boolean isWandEnabled() {
 		return active.wandEnabled;
 	}
@@ -218,6 +250,8 @@ public class MineFabSettings {
 			case "3d_viewport_settings.camera_speed" -> formatNumber(active.cameraSpeed);
 			case "3d_viewport_settings.camera_acceleration_enabled" -> Boolean.toString(active.cameraAccelerationEnabled);
 			case "3d_viewport_settings.camera_acceleration_factor" -> formatNumber(active.cameraAccelerationFactor);
+			case "3d_viewport_settings.max_render_blocks" -> Integer.toString(active.maxRenderBlocks);
+			case "3d_viewport_settings.interactive_render_blocks" -> Integer.toString(active.interactiveRenderBlocks);
 			case "keybinds.toggle_outline" -> active.keybindToggleOutline;
 			case "keybinds.3d_viewport_camera_rotation" -> active.keybindCameraRotation;
 			case "keybinds.3d_viewport_camera_zoom" -> active.keybindCameraZoom;
@@ -254,6 +288,8 @@ public class MineFabSettings {
 			case "3d_viewport_settings.camera_speed" -> active.cameraSpeed = clampFactor(Double.parseDouble(raw));
 			case "3d_viewport_settings.camera_acceleration_enabled" -> active.cameraAccelerationEnabled = parseBooleanValue(raw);
 			case "3d_viewport_settings.camera_acceleration_factor" -> active.cameraAccelerationFactor = clampFactor(Double.parseDouble(raw));
+			case "3d_viewport_settings.max_render_blocks" -> active.maxRenderBlocks = clampMaxRenderBlocks(parseBlockCount(raw));
+			case "3d_viewport_settings.interactive_render_blocks" -> active.interactiveRenderBlocks = clampMaxRenderBlocks(parseBlockCount(raw));
 			case "keybinds.toggle_outline" -> active.keybindToggleOutline = sanitizeText(raw, active.keybindToggleOutline);
 			case "keybinds.3d_viewport_camera_rotation" -> active.keybindCameraRotation = sanitizeText(raw, active.keybindCameraRotation);
 			case "keybinds.3d_viewport_camera_zoom" -> active.keybindCameraZoom = sanitizeText(raw, active.keybindCameraZoom);
@@ -355,6 +391,8 @@ public class MineFabSettings {
 			s.cameraSpeed = n.viewportSettings.cameraSpeed;
 			s.cameraAccelerationEnabled = n.viewportSettings.cameraAccelerationEnabled;
 			s.cameraAccelerationFactor = n.viewportSettings.cameraAccelerationFactor;
+			s.maxRenderBlocks = n.viewportSettings.maxRenderBlocks;
+			s.interactiveRenderBlocks = n.viewportSettings.interactiveRenderBlocks;
 		}
 		if (n.keybinds != null) {
 			s.keybindToggleOutline = sanitizeText(n.keybinds.toggleOutline, s.keybindToggleOutline);
@@ -399,6 +437,8 @@ public class MineFabSettings {
 		doc.settings.viewportSettings.cameraSpeed = s.cameraSpeed;
 		doc.settings.viewportSettings.cameraAccelerationEnabled = s.cameraAccelerationEnabled;
 		doc.settings.viewportSettings.cameraAccelerationFactor = s.cameraAccelerationFactor;
+		doc.settings.viewportSettings.maxRenderBlocks = s.maxRenderBlocks;
+		doc.settings.viewportSettings.interactiveRenderBlocks = s.interactiveRenderBlocks;
 
 		doc.settings.keybinds = new KeybindsNode();
 		doc.settings.keybinds.toggleOutline = s.keybindToggleOutline;
@@ -434,6 +474,8 @@ public class MineFabSettings {
 		s.mouseAccelerationFactor = clampFactor(s.mouseAccelerationFactor);
 		s.cameraSpeed = clampFactor(s.cameraSpeed);
 		s.cameraAccelerationFactor = clampFactor(s.cameraAccelerationFactor);
+		s.maxRenderBlocks = clampMaxRenderBlocks(s.maxRenderBlocks);
+		s.interactiveRenderBlocks = clampMaxRenderBlocks(s.interactiveRenderBlocks);
 		s.metersPerBlock = clampMetersPerBlock(s.metersPerBlock);
 		s.measurementUnit = DEFAULT_MEASUREMENT_UNIT;
 		s.wandDefaultItem = sanitizeText(s.wandDefaultItem, DEFAULT_WAND_ITEM);
@@ -489,6 +531,23 @@ public class MineFabSettings {
 		return Math.max(0.000001D, Math.min(1_000_000D, value));
 	}
 
+	private static int clampMaxRenderBlocks(int value) {
+		if (value <= 0) {
+			return DEFAULT_MAX_RENDER_BLOCKS;
+		}
+		return Math.max(MIN_MAX_RENDER_BLOCKS, Math.min(MAX_MAX_RENDER_BLOCKS, value));
+	}
+
+	/** Accepts plain integers and tolerates separators/decimals such as "100,000", "100_000" or "1e5". */
+	private static int parseBlockCount(String raw) {
+		String cleaned = raw.replace(",", "").replace("_", "").trim();
+		double parsed = Double.parseDouble(cleaned);
+		if (Double.isNaN(parsed) || Double.isInfinite(parsed)) {
+			throw new IllegalArgumentException("Expected a whole number of blocks but got: " + raw);
+		}
+		return (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, Math.round(parsed)));
+	}
+
 	private static int normalizeColor(int color) {
 		return color | 0xFF000000;
 	}
@@ -535,6 +594,10 @@ public class MineFabSettings {
 		private boolean cameraAccelerationEnabled = true;
 		@SerializedName("camera_acceleration_factor")
 		private double cameraAccelerationFactor = 1.0D;
+		@SerializedName("max_render_blocks")
+		private int maxRenderBlocks = 100_000;
+		@SerializedName("interactive_render_blocks")
+		private int interactiveRenderBlocks = 25_000;
 	}
 
 	private static class KeybindsNode {

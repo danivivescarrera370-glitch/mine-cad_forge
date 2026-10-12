@@ -24,19 +24,20 @@ public record ScenePipRenderState(
     Matrix3x2fc pose,
     @Nullable ScreenRectangle scissorArea,
     @Nullable ScreenRectangle bounds,
-    long sceneStamp
+    long sceneStamp,
+    int blockBudget
 ) implements PictureInPictureRenderState {
 
   public ScenePipRenderState(ScannedBlockScene scene, float yawDegrees, float pitchDegrees,
                              float offsetX, float offsetY, int x0, int y0, int x1, int y1, float scale,
-                             Matrix3x2fc pose, @Nullable ScreenRectangle scissorArea) {
+                             Matrix3x2fc pose, @Nullable ScreenRectangle scissorArea, int blockBudget) {
     this(scene, yawDegrees, pitchDegrees, offsetX, offsetY, x0, y0, x1, y1, scale, pose, scissorArea,
-        PictureInPictureRenderState.getBounds(x0, y0, x1, y1, scissorArea), scene.stamp());
+        PictureInPictureRenderState.getBounds(x0, y0, x1, y1, scissorArea), scene.stamp(), blockBudget);
   }
 
   /** Two states with equal keys produce the same image, so the previous frame can be reused. */
   public List<Object> cacheKey() {
-    return List.of(yawDegrees, pitchDegrees, offsetX, offsetY, scale, sceneStamp, x1 - x0, y1 - y0);
+    return List.of(yawDegrees, pitchDegrees, offsetX, offsetY, scale, sceneStamp, x1 - x0, y1 - y0, blockBudget);
   }
 }
 

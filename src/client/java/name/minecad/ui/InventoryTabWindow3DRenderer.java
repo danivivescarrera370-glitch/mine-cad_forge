@@ -32,6 +32,7 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   private static final double MIN_RENDER_SCALE_PERCENT = 0.10;
   private static final double MAX_RENDER_SCALE_PERCENT = 2.00;
   private static final double ZOOM_STEP = 1.10; // scale change per wheel notch
+  private static final long VIEW_SETTLE_NANOS = 150_000_000L; // still for this long -> full quality
 
   private final ScannedBlockScene scene = new ScannedBlockScene();
   private double yawDegrees = 0.0; // looking north from the south side
@@ -47,6 +48,13 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   private double offsetZ;
   private long lastMoveNanos;
   private boolean resetBindingPreviouslyDown;
+  // Used to tell whether the view is currently moving (see renderScene).
+  private double lastYaw = Double.NaN;
+  private double lastPitch = Double.NaN;
+  private double lastOffsetX = Double.NaN;
+  private double lastOffsetY = Double.NaN;
+  private float lastScale = Float.NaN;
+  private long lastViewChangeNanos = Long.MIN_VALUE / 2;
 
   private float defaultRotation;
   private float defaultXPosition;
@@ -253,6 +261,9 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   private void drawStatusText(GuiGraphicsExtractor graphics, Font font, int x, int y) {
     if (scene.isEmpty()) {
       graphics.text(font, Component.literal("No blocks selected"), x + 8, y + getHeight() - 12, 0xFF404040, false);
+    } else if (scene.isCapped()) {
+      graphics.text(font, Component.literal("Render limit: " + scene.previewBlockCount() + " of "
+          + scene.visibleBlockCount() + " visible blocks"), x + 8, y + getHeight() - 12, 0xFF404040, false);
     } else if (scene.isSimplified()) {
       graphics.text(font, Component.literal("Surface preview: " + scene.previewBlockCount() + " of "
           + scene.selectedBlockCount() + " blocks"), x + 8, y + getHeight() - 12, 0xFF404040, false);
@@ -271,18 +282,39 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
       return;
     }
 
-    scene.update();
-    if (scene.isEmpty()) {
-      return;
-    }
-
     // Moving "forward" brings the scene closer, which in an orthographic view is the same as zooming.
     double zoom = CAMERA_DISTANCE / (CAMERA_DISTANCE + offsetZ);
     float scale = (float) (Math.min(areaWidth, areaHeight) * SCENE_SCALE * renderScalePercent * zoom);
+
+    // While the view is changing every frame is a full re-render, so draw the cheaper coarse preview
+    // of the scene; once the view has been still for a moment the full scene is rendered one more time.
+    long now = System.nanoTime();
+    if (yawDegrees != lastYaw || pitchDegrees != lastPitch || offsetX != lastOffsetX
+        || offsetY != lastOffsetY || scale != lastScale) {
+      lastYaw = yawDegrees;
+      lastPitch = pitchDegrees;
+      lastOffsetX = offsetX;
+      lastOffsetY = offsetY;
+      lastScale = scale;
+      lastViewChangeNanos = now;
+    }
+    // Holding the drag button (rotate/pan) keeps the low detail even when the mouse is momentarily still.
+    if (dragging) {
+      lastViewChangeNanos = now;
+    }
+    boolean viewBusy = now - lastViewChangeNanos < VIEW_SETTLE_NANOS;
+
+    // Rebuilding a big scene takes long, so block-state-only changes wait until the view is still.
+    scene.update(viewBusy);
+    if (scene.isEmpty()) {
+      return;
+    }
+    int blockBudget = viewBusy ? scene.lodBlockCount() : 0;
+
     ScreenRectangle scissor = graphics.scissorStack.peek();
     graphics.guiRenderState.addPicturesInPictureState(new ScenePipRenderState(
         scene, (float) yawDegrees, (float) pitchDegrees, (float) offsetX, (float) offsetY,
-        left, top, right, bottom, scale, new Matrix3x2f(graphics.pose()), scissor));
+        left, top, right, bottom, scale, new Matrix3x2f(graphics.pose()), scissor, blockBudget));
   }
 
   private void checkResetShortcut() {

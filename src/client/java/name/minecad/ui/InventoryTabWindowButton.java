@@ -27,11 +27,12 @@ public class InventoryTabWindowButton extends InventoryTabWindow {
   private static final int FACE_DISABLED = 0xFF8B8B8B;
   private static final int TEXT = 0xFF202020;
   private static final int TEXT_DISABLED = 0xFF606060;
-  private static final int TEXT_HEIGHT = 8;
+  private static final float DEFAULT_FONT_SIZE = 1.0F;
 
   private Component label;
   private Runnable action;
   private boolean enabled = true;
+  private float fontSize = DEFAULT_FONT_SIZE;
 
   public InventoryTabWindowButton(int width, int height, Component label, Runnable action) {
     super(width, height);
@@ -67,6 +68,15 @@ public class InventoryTabWindowButton extends InventoryTabWindow {
     return enabled;
   }
 
+  /** Scales the button label text; 1.0 is default size. */
+  public void setFontSize(float fontSize) {
+    if (!Float.isFinite(fontSize) || fontSize <= 0.0F) {
+      this.fontSize = DEFAULT_FONT_SIZE;
+      return;
+    }
+    this.fontSize = fontSize;
+  }
+
   /** Runs the button's action (if enabled). Also usable to trigger the button from code. */
   public void press() {
     if (!enabled || action == null) {
@@ -90,9 +100,26 @@ public class InventoryTabWindowButton extends InventoryTabWindow {
     graphics.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, SHADOW);
     graphics.fill(x + w - 2, y + 1, x + w - 1, y + h - 1, SHADOW);
 
-    int textX = x + (w - font.width(label)) / 2;
-    int textY = y + (h - TEXT_HEIGHT) / 2;
-    graphics.text(font, label, textX, textY, enabled ? TEXT : TEXT_DISABLED, false);
+    String[] lines = label.getString().split("\\n", -1);
+    int lineHeight = Math.max(1, Math.round(font.lineHeight * fontSize));
+    int blockHeight = lineHeight * lines.length;
+    int textY = y + (h - blockHeight) / 2;
+
+    for (String line : lines) {
+      Component lineComponent = Component.literal(line);
+      int lineWidth = Math.round(font.width(lineComponent) * fontSize);
+      int textX = x + (w - lineWidth) / 2;
+      if (Math.abs(fontSize - 1.0F) < 0.0001F) {
+        graphics.text(font, lineComponent, textX, textY, enabled ? TEXT : TEXT_DISABLED, false);
+      } else {
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(textX, textY);
+        graphics.pose().scale(fontSize, fontSize);
+        graphics.text(font, lineComponent, 0, 0, enabled ? TEXT : TEXT_DISABLED, false);
+        graphics.pose().popMatrix();
+      }
+      textY += lineHeight;
+    }
   }
 }
 

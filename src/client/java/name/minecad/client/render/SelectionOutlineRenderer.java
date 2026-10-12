@@ -1,6 +1,5 @@
 package name.minecad.client.render;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -9,15 +8,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import name.minecad.MineCad;
+import name.minecad.client.input.BindingInput;
 import name.minecad.scannedblock.ScannedBlock;
 import name.minecad.scannedblock.ScannedBlockManager;
 import name.minecad.ui.MineFabSettings;
 import name.minecad.wand.WandManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -33,17 +31,11 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import org.lwjgl.glfw.GLFW;
 
 public final class SelectionOutlineRenderer {
     private static final double OUTLINE_INFLATE = 0.002D;
     private static final Direction[] NEIGHBORS = Direction.values();
-    private static final KeyMapping TOGGLE_OUTLINES_KEY = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-            "key.mine-cad.toggle_outlines",
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_O,
-            KeyMapping.Category.MISC
-    ));
+    private static boolean toggleBindingPreviouslyDown;
     private static long cachedRevision = Long.MIN_VALUE;
     private static int cachedOutlineColor = Integer.MIN_VALUE;
     private static float cachedStrokeWidth = Float.NaN;
@@ -58,11 +50,7 @@ public final class SelectionOutlineRenderer {
                 MineCad.getScannedBlockManager().tick(client.level);
             }
 
-            while (TOGGLE_OUTLINES_KEY.consumeClick()) {
-                boolean enabled = !MineFabSettings.areOutlinesEnabled();
-                MineFabSettings.setOutlinesEnabled(enabled);
-                sendClientFeedback(client, "Selection outlines " + (enabled ? "enabled" : "disabled"));
-            }
+            handleOutlineToggleHotkey(client);
         });
 
         LevelRenderEvents.BEFORE_GIZMOS.register(SelectionOutlineRenderer::renderSelectionOutlines);
@@ -314,6 +302,17 @@ public final class SelectionOutlineRenderer {
         }
 
         return blockHitResult.getBlockPos();
+    }
+
+    private static void handleOutlineToggleHotkey(Minecraft client) {
+        long handle = client.getWindow().handle();
+        boolean down = BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.toggle_outline"), handle);
+        if (down && !toggleBindingPreviouslyDown) {
+            boolean enabled = !MineFabSettings.areOutlinesEnabled();
+            MineFabSettings.setOutlinesEnabled(enabled);
+            sendClientFeedback(client, "Selection outlines " + (enabled ? "enabled" : "disabled"));
+        }
+        toggleBindingPreviouslyDown = down;
     }
 
     private static boolean isHoldingWand(LocalPlayer player) {

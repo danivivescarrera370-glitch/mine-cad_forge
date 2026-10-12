@@ -1,0 +1,54 @@
+{
+    "settings":
+    {
+
+      "outline_settings":
+      {
+        "enabled": true,
+        "color": "#FF0000",
+        "thickness": 2
+      },
+
+      "3d_viewport_settings":
+      {
+        "background_color": "#FFFFFF",
+        "mouse_sensitivity": 1.0,
+        "mouse_acceleration_enabled": true,
+        "mouse_acceleration_factor": 1.0,
+        "camera_speed": 1.0,
+        "camera_acceleration_enabled": true,
+        "camera_acceleration_factor": 1.0
+      },
+
+      "keybinds":
+      {
+        "toggle_outline": "O",
+        "3d_viewport_camera_rotation": "MOUSE_SCROLL_CLICK",
+        "3d_viewport_camera_zoom": "MOUSE_SCROLL",
+        "3d_viewport_camera_pan": "MOUSE_RIGHT_CLICK",
+        "3d_viewport_camera_reset": "R",
+        "3d_viewport_camera_speed_increase": "SHIFT",
+        "3d_viewport_camera_speed_decrease": "CTRL",
+        "3d_viewport_camera_speed_reset": "ALT",
+        "3d_viewport_camera_in": "MOUSE_SCROLL_CLICK + W",
+        "3d_viewport_camera_out": "MOUSE_SCROLL_CLICK + S",
+        "3d_viewport_camera_left": "MOUSE_SCROLL_CLICK + A",
+        "3d_viewport_camera_right": "MOUSE_SCROLL_CLICK + D",
+        "3d_viewport_camera_up": "MOUSE_SCROLL_CLICK + E",
+        "3d_viewport_camera_down": "MOUSE_SCROLL_CLICK + Q"
+      },
+
+      "measurements":
+      {
+        "unit": "meters",
+        "block_to_unit_scale": 1.0
+      },
+
+      "wand":
+      {
+        "enabled": true,
+        "default_wand_item": "minecraft:stick"
+      }
+
+    }
+}

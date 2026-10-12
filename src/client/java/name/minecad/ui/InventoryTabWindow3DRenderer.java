@@ -5,6 +5,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.network.chat.Component;
+import name.minecad.client.input.BindingInput;
 import org.joml.Matrix3x2f;
 import org.lwjgl.glfw.GLFW;
 
@@ -23,6 +24,7 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   private static final double ROTATE_SENSITIVITY = 0.35;
   private static final double ACCELERATION = 0.15; // extra rotation multiplier per pixel of mouse movement
   private static final double MAX_ACCELERATION = 6.0;
+  private static final double PAN_SENSITIVITY = 0.01;
   private static final double MOVE_SPEED = 3.0; // preview units per second
   private static final double CAMERA_DISTANCE = 4.5;
   private static final double SCENE_SCALE = 0.70;
@@ -35,6 +37,7 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   private double yawDegrees = 0.0; // looking north from the south side
   private double pitchDegrees = -25.0;
   private boolean dragging;
+  private DragMode dragMode = DragMode.NONE;
   private double savedCursorX;
   private double savedCursorY;
   private double renderScalePercent = DEFAULT_RENDER_SCALE_PERCENT;
@@ -43,11 +46,23 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   private double offsetY;
   private double offsetZ;
   private long lastMoveNanos;
+  private boolean resetBindingPreviouslyDown;
+
+  private float defaultRotation;
+  private float defaultXPosition;
+  private float defaultYPosition;
+  private float defaultZPosition;
 
   public InventoryTabWindow3DRenderer(int width, int height) {
     super(width, height);
     setTitle(Component.literal("3D"));
     setBackgroundColor(0xFFECECEC);
+
+    // set the default rotation and position values
+    defaultRotation = 0.0f;
+    defaultXPosition = 0.0f;
+    defaultYPosition = 0.0f;
+    defaultZPosition = 0.0f;
   }
 
   // ---------------------------------------------------------------- settings
@@ -63,13 +78,32 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     this.renderScalePercent = renderScalePercent;
   }
 
+  public void resetCameraPosition() {
+    yawDegrees = defaultRotation;
+    offsetX = defaultXPosition;
+    offsetY = defaultYPosition;
+    offsetZ = defaultZPosition;
+  }
+
   // ---------------------------------------------------------------- interaction
 
   @Override
   public boolean beginMouseDrag(int button) {
-    if (button != 2) {
+    int rotateButton = BindingInput.mouseButtonForBinding(
+        MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_rotation"),
+        GLFW.GLFW_MOUSE_BUTTON_MIDDLE);
+    int panButton = BindingInput.mouseButtonForBinding(
+        MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_pan"),
+        GLFW.GLFW_MOUSE_BUTTON_RIGHT);
+
+    if (button == rotateButton) {
+      dragMode = DragMode.ROTATE;
+    } else if (button == panButton) {
+      dragMode = DragMode.PAN;
+    } else {
       return false;
     }
+
     dragging = true;
     lastMoveNanos = System.nanoTime();
     long handle = Minecraft.getInstance().getWindow().handle();
@@ -85,23 +119,38 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
 
   @Override
   public void onMouseDrag(double localX, double localY, double deltaX, double deltaY, int button) {
-    if (!dragging || button != 2) {
+    if (!dragging) {
       return;
     }
 
-    // Mouse acceleration: the faster the mouse moves, the more each pixel rotates.
-    double speed = Math.hypot(deltaX, deltaY);
-    double factor = Math.min(MAX_ACCELERATION, 1.0 + ACCELERATION * speed);
-    yawDegrees += deltaX * ROTATE_SENSITIVITY * factor;
-    pitchDegrees -= deltaY * ROTATE_SENSITIVITY * factor;
-    pitchDegrees = Math.max(-89.0, Math.min(89.0, pitchDegrees));
+    if (dragMode == DragMode.ROTATE) {
+      // Mouse acceleration: the faster the mouse moves, the more each pixel rotates.
+      double speed = Math.hypot(deltaX, deltaY);
+      double sensitivity = ROTATE_SENSITIVITY * MineFabSettings.getMouseSensitivity();
+      double factor = 1.0;
+      if (MineFabSettings.isMouseAccelerationEnabled()) {
+        factor = Math.min(
+            MAX_ACCELERATION,
+            1.0 + (ACCELERATION * MineFabSettings.getMouseAccelerationFactor() * speed));
+      }
+      yawDegrees += deltaX * sensitivity * factor;
+      pitchDegrees -= deltaY * sensitivity * factor;
+      pitchDegrees = Math.max(-89.0, Math.min(89.0, pitchDegrees));
+      return;
+    }
+
+    if (dragMode == DragMode.PAN) {
+      double panStep = PAN_SENSITIVITY * MineFabSettings.getCameraSpeed();
+      offsetX -= deltaX * panStep;
+      offsetY += deltaY * panStep;
+      offsetX = Math.max(-20.0, Math.min(20.0, offsetX));
+      offsetY = Math.max(-20.0, Math.min(20.0, offsetY));
+    }
   }
 
   @Override
   public void endMouseDrag(int button) {
-    if (button == 2) {
-      stopDragging();
-    }
+    stopDragging();
   }
 
   /** Shows the cursor again and puts it back where the drag started. */
@@ -110,6 +159,7 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
       return;
     }
     dragging = false;
+    dragMode = DragMode.NONE;
     long handle = Minecraft.getInstance().getWindow().handle();
     GLFW.glfwSetInputMode(handle, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
     GLFW.glfwSetCursorPos(handle, savedCursorX, savedCursorY);
@@ -120,24 +170,38 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     long now = System.nanoTime();
     double dt = Math.min(0.1, (now - lastMoveNanos) / 1.0e9);
     lastMoveNanos = now;
-    double step = MOVE_SPEED * dt;
+    double step = MOVE_SPEED * MineFabSettings.getCameraSpeed() * dt;
+    if (MineFabSettings.isCameraAccelerationEnabled()) {
+      step *= MineFabSettings.getCameraAccelerationFactor();
+    }
+
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_speed_reset"), handle)) {
+      step = MOVE_SPEED * dt;
+    }
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_speed_increase"), handle)) {
+      step *= 2.0;
+    }
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_speed_decrease"), handle)) {
+      step *= 0.5;
+    }
+
     // Objects move opposite to the camera in view space.
-    if (GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS) {
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_in"), handle)) {
       offsetZ -= step;
     }
-    if (GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS) {
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_out"), handle)) {
       offsetZ += step;
     }
-    if (GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS) {
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_left"), handle)) {
       offsetX += step;
     }
-    if (GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS) {
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_right"), handle)) {
       offsetX -= step;
     }
-    if (GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_E) == GLFW.GLFW_PRESS) {
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_up"), handle)) {
       offsetY -= step;
     }
-    if (GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_Q) == GLFW.GLFW_PRESS) {
+    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_down"), handle)) {
       offsetY += step;
     }
     offsetZ = Math.max(-CAMERA_DISTANCE + 2.0, Math.min(30.0, offsetZ));
@@ -151,7 +215,13 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     if (verticalAmount == 0) {
       return false;
     }
-    double scaled = renderScalePercent * Math.pow(ZOOM_STEP, verticalAmount);
+    long handle = Minecraft.getInstance().getWindow().handle();
+    if (!BindingInput.isScrollBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_zoom"), handle)) {
+      return false;
+    }
+
+    double zoomInput = verticalAmount * MineFabSettings.getMouseSensitivity();
+    double scaled = renderScalePercent * Math.pow(ZOOM_STEP, zoomInput);
     renderScalePercent = Math.max(MIN_RENDER_SCALE_PERCENT, Math.min(MAX_RENDER_SCALE_PERCENT, scaled));
     return true;
   }
@@ -160,11 +230,17 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
 
   @Override
   protected void drawSelf(GuiGraphicsExtractor graphics, Font font, int x, int y, int mouseX, int mouseY) {
+    setBackgroundColor(MineFabSettings.getViewportBackgroundColor());
     super.drawSelf(graphics, font, x, y, mouseX, mouseY);
+    checkResetShortcut();
     if (dragging) {
       long handle = Minecraft.getInstance().getWindow().handle();
-      // Safety net: if the middle button release was missed, give the cursor back.
-      if (GLFW.glfwGetMouseButton(handle, GLFW.GLFW_MOUSE_BUTTON_MIDDLE) != GLFW.GLFW_PRESS) {
+      int expectedButton = dragMode == DragMode.PAN
+          ? BindingInput.mouseButtonForBinding(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_pan"), GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+          : BindingInput.mouseButtonForBinding(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_rotation"), GLFW.GLFW_MOUSE_BUTTON_MIDDLE);
+
+      // Safety net: if release was missed, give the cursor back.
+      if (GLFW.glfwGetMouseButton(handle, expectedButton) != GLFW.GLFW_PRESS) {
         stopDragging();
       } else {
         applyKeyboardMovement(handle);
@@ -207,6 +283,21 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     graphics.guiRenderState.addPicturesInPictureState(new ScenePipRenderState(
         scene, (float) yawDegrees, (float) pitchDegrees, (float) offsetX, (float) offsetY,
         left, top, right, bottom, scale, new Matrix3x2f(graphics.pose()), scissor));
+  }
+
+  private void checkResetShortcut() {
+    long handle = Minecraft.getInstance().getWindow().handle();
+    boolean down = BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_reset"), handle);
+    if (down && !resetBindingPreviouslyDown) {
+      resetCameraPosition();
+    }
+    resetBindingPreviouslyDown = down;
+  }
+
+  private enum DragMode {
+    NONE,
+    ROTATE,
+    PAN
   }
 }
 

@@ -1,12 +1,17 @@
 package name.minecad.wand;
 
 import name.minecad.scannedblock.ScannedBlockManager;
+import name.minecad.ui.MineFabSettings;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -24,6 +29,7 @@ public class WandManager {
     public WandManager(Wand wand, ScannedBlockManager scannedBlockManager) {
         this.wand = wand;
         this.scannedBlockManager = scannedBlockManager;
+        refreshConfiguredWandItem();
     }
 
     public Wand getWand() {
@@ -35,6 +41,9 @@ public class WandManager {
      */
     public void registerEvents() {
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            if (!MineFabSettings.isWandEnabled()) {
+                return InteractionResult.PASS;
+            }
             if (player.isShiftKeyDown()) {
                 return handleWandRemoval(player, world, hand, hitResult.getBlockPos());
             }
@@ -54,7 +63,7 @@ public class WandManager {
     public InteractionResult detectWandRightClick(Player player, Level world, InteractionHand hand) {
 
         // if the player is holding the wand item
-        if (player.getItemInHand(hand).getItem() == wand.getItemForWand()) {
+        if (isHoldingConfiguredWand(player, hand)) {
             if (world.isClientSide()) {
                 return InteractionResult.SUCCESS;
             }
@@ -90,7 +99,7 @@ public class WandManager {
      */
     public InteractionResult detectWandShiftRightClick(Player player, Level world, InteractionHand hand) {
         // Check if the player is holding the wand item and is sneaking (shift-right-click)
-        if (player.getItemInHand(hand).getItem() == wand.getItemForWand() && player.isShiftKeyDown()) {
+        if (isHoldingConfiguredWand(player, hand) && player.isShiftKeyDown()) {
             if (world.isClientSide()) {
                 return InteractionResult.SUCCESS;
             }
@@ -123,7 +132,7 @@ public class WandManager {
     }
 
     private InteractionResult handleWandSelection(Player player, Level world, InteractionHand hand, BlockPos pos) {
-        if (player.getItemInHand(hand).getItem() != wand.getItemForWand()) {
+        if (!isHoldingConfiguredWand(player, hand)) {
             return InteractionResult.PASS;
         }
         if (world.isClientSide()) {
@@ -142,7 +151,7 @@ public class WandManager {
     }
 
     private InteractionResult handleWandRemoval(Player player, Level world, InteractionHand hand, BlockPos pos) {
-        if (player.getItemInHand(hand).getItem() != wand.getItemForWand()) {
+        if (!isHoldingConfiguredWand(player, hand)) {
             return InteractionResult.PASS;
         }
         if (world.isClientSide()) {
@@ -171,7 +180,7 @@ public class WandManager {
      */
     public InteractionResult detectBlockDestroyedByWand(Player player, Level world, InteractionHand hand) {
         // Check if the player is holding the wand item
-        if (player.getItemInHand(hand).getItem() == wand.getItemForWand()) {
+        if (isHoldingConfiguredWand(player, hand)) {
             if (world.isClientSide()) {
                 return InteractionResult.SUCCESS;
             }
@@ -218,8 +227,40 @@ public class WandManager {
 
 
     public String getWandInfo() {
+        Item currentWandItem = refreshConfiguredWandItem();
+        return "Wand enabled: " + MineFabSettings.isWandEnabled() + "\n"
+                + "Current wand ID: " + currentWandItem.getDescriptionId();
+    }
 
-        return "Current wand ID: " + this.wand.getItemForWand().getDescriptionId();
+    public Item refreshConfiguredWandItem() {
+        Item configured = resolveConfiguredWandItem();
+        if (configured != wand.getItemForWand()) {
+            wand.changeWand(configured);
+        }
+        return configured;
+    }
+
+    private boolean isHoldingConfiguredWand(Player player, InteractionHand hand) {
+        if (!MineFabSettings.isWandEnabled()) {
+            return false;
+        }
+        Item activeWandItem = refreshConfiguredWandItem();
+        return player.getItemInHand(hand).getItem() == activeWandItem;
+    }
+
+    private Item resolveConfiguredWandItem() {
+        String configured = MineFabSettings.getWandDefaultItem();
+        String[] parts = configured.split(":", 2);
+        if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
+            return Items.STICK;
+        }
+        try {
+            Identifier id = Identifier.fromNamespaceAndPath(parts[0], parts[1]);
+            Item item = BuiltInRegistries.ITEM.getValue(id);
+            return item == null ? Items.STICK : item;
+        } catch (RuntimeException ignored) {
+            return Items.STICK;
+        }
     }
 
 }

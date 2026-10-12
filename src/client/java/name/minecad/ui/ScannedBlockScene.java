@@ -23,7 +23,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 
@@ -206,10 +205,10 @@ public class ScannedBlockScene {
       if (state.isAir()) {
         continue;
       }
-      VoxelShape shape = state.getShape(level, pos);
-      AABB bounds = shape.isEmpty() ? new AABB(0, 0, 0, 1, 1, 1) : shape.bounds();
-      boolean full = bounds.minX <= 0 && bounds.minY <= 0 && bounds.minZ <= 0
-          && bounds.maxX >= 1 && bounds.maxY >= 1 && bounds.maxZ >= 1;
+      // Culling must only treat true full occluders as "solid", otherwise partial blocks like
+      // stairs/slabs can incorrectly hide neighboring faces and create holes.
+      VoxelShape occlusion = state.getOcclusionShape();
+      boolean full = state.canOcclude() && net.minecraft.world.level.block.Block.isShapeFullBlock(occlusion);
       prepared.put(pos.asLong(), new PreparedBlock(pos, state, full));
     }
     selectedBlockCount = prepared.size();
@@ -243,13 +242,15 @@ public class ScannedBlockScene {
       BlockState state = block.state();
 
       int hiddenMask = 0;
-      for (Direction direction : DIRECTIONS) {
-        long neighbour = BlockPos.asLong(
-            pos.getX() + direction.getStepX(),
-            pos.getY() + direction.getStepY(),
-            pos.getZ() + direction.getStepZ());
-        if (Boolean.TRUE.equals(drawnFull.get(neighbour))) {
-          hiddenMask |= 1 << direction.ordinal();
+      if (block.full()) {
+        for (Direction direction : DIRECTIONS) {
+          long neighbour = BlockPos.asLong(
+              pos.getX() + direction.getStepX(),
+              pos.getY() + direction.getStepY(),
+              pos.getZ() + direction.getStepZ());
+          if (Boolean.TRUE.equals(drawnFull.get(neighbour))) {
+            hiddenMask |= 1 << direction.ordinal();
+          }
         }
       }
 
@@ -267,14 +268,18 @@ public class ScannedBlockScene {
     }
   }
 
-  /** A block is on the surface when at least one direct neighbour is not part of the selection. */
+  /**
+   * A block is on the surface when at least one direct neighbour is missing from the selection or
+   * is not a full occluder (stairs, slabs, ... leave gaps, so the block behind them is still visible).
+   */
   private static boolean isSurface(BlockPos pos, Map<Long, PreparedBlock> selection) {
     for (Direction direction : DIRECTIONS) {
       long neighbour = BlockPos.asLong(
           pos.getX() + direction.getStepX(),
           pos.getY() + direction.getStepY(),
           pos.getZ() + direction.getStepZ());
-      if (!selection.containsKey(neighbour)) {
+      PreparedBlock neighbourBlock = selection.get(neighbour);
+      if (neighbourBlock == null || !neighbourBlock.full()) {
         return true;
       }
     }

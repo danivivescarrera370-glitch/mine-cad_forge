@@ -101,11 +101,18 @@ public class CommandParser {
 
         // Check pipeable commands from your JSON structure
         switch (baseCommand) {
+            case "minecad":
+                if (parts.length > 2 && "selection".equals(parts[1])) {
+                    String subcommand = parts[2];
+                    return Arrays.asList("show", "delete", "save", "import", "list",
+                            "select", "add", "remove", "subtract", "geometry", "export", "scale").contains(subcommand);
+                }
+                return false;
             case "selection":
                 if (parts.length > 1) {
                     String subcommand = parts[1];
                     return Arrays.asList("show", "delete", "save", "import", "list",
-                            "select", "add", "remove", "subtract", "geometry").contains(subcommand);
+                            "select", "add", "remove", "subtract", "geometry", "export", "scale").contains(subcommand);
                 }
                 return false;
             default:

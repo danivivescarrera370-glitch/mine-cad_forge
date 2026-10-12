@@ -1,8 +1,10 @@
 package name.minecad.scannedblock;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -13,6 +15,7 @@ public class ScannedBlockManager {
     private final Object lock = new Object();
     private final List<ScannedBlock> scannedBlocks = new ArrayList<>();
     private final Set<BlockPos> scannedPositions = new HashSet<>();
+    private final Map<BlockPos, BlockState> scannedStates = new HashMap<>();
     private final int updateInterval;
     private int tickCounter = 0;
     private long selectionRevision = 0;
@@ -72,6 +75,7 @@ public class ScannedBlockManager {
 
             scannedBlocks.add(new ScannedBlock(block, pos));
             scannedPositions.add(pos);
+            scannedStates.put(pos, world.getBlockState(pos));
             selectionRevision++;
         }
         if (logSelectionChange) {
@@ -135,6 +139,7 @@ public class ScannedBlockManager {
             removed = scannedBlocks.removeIf(scannedBlock -> scannedBlock.pos.equals(pos));
             if (removed) {
                 scannedPositions.remove(pos);
+                scannedStates.remove(pos);
                 selectionRevision++;
             }
         }
@@ -161,15 +166,18 @@ public class ScannedBlockManager {
 
         for (int i = 0; i < scannedBlocks.size(); i++) {
             ScannedBlock scannedBlock = scannedBlocks.get(i);
-            Block currentBlock = world.getBlockState(scannedBlock.pos).getBlock();
+            BlockState currentState = world.getBlockState(scannedBlock.pos);
+            BlockState previousState = scannedStates.get(scannedBlock.pos);
 
-            // If the block has changed, update it
-            if (!scannedBlock.block.equals(currentBlock)) {
+            // State changes (e.g. stair shape/facing) must also trigger a rebuild.
+            if (previousState == null || !previousState.equals(currentState)) {
+                Block currentBlock = currentState.getBlock();
                 System.out.println("Block state changed at " + scannedBlock.pos + ": " +
                         scannedBlock.block.getName().getString() + " -> " + currentBlock.getName().getString());
 
                 // Replace with updated block
                 scannedBlocks.set(i, new ScannedBlock(currentBlock, scannedBlock.pos));
+                scannedStates.put(scannedBlock.pos, currentState);
                 selectionRevision++;
             }
         }
@@ -185,9 +193,12 @@ public class ScannedBlockManager {
             for (int i = 0; i < scannedBlocks.size(); i++) {
                 ScannedBlock scannedBlock = scannedBlocks.get(i);
                 if (scannedBlock.pos.equals(pos)) {
-                    Block currentBlock = world.getBlockState(pos).getBlock();
-                    if (!scannedBlock.block.equals(currentBlock)) {
+                    BlockState currentState = world.getBlockState(pos);
+                    BlockState previousState = scannedStates.get(pos);
+                    if (previousState == null || !previousState.equals(currentState)) {
+                        Block currentBlock = currentState.getBlock();
                         scannedBlocks.set(i, new ScannedBlock(currentBlock, pos));
+                        scannedStates.put(pos, currentState);
                         selectionRevision++;
                         System.out.println("Updated block at " + pos + " to " + currentBlock.getName().getString());
                         return true;
@@ -229,6 +240,7 @@ public class ScannedBlockManager {
             }
             scannedBlocks.clear();
             scannedPositions.clear();
+            scannedStates.clear();
         }
     }
 

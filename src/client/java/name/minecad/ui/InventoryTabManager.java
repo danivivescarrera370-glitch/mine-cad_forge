@@ -36,6 +36,8 @@ public final class InventoryTabManager {
     private int activeDragRootX;
     private int activeDragRootY;
     private int activeDragButton = -1;
+    private InventoryTabWindowTextField focusedTextField;
+    private InventoryTabWindowKeybindField focusedKeybindField;
 
     public InventoryTabManager(InventoryTab mineCadTab) {
         this.mineCadTab = mineCadTab;
@@ -95,11 +97,41 @@ public final class InventoryTabManager {
       {
         // While a window is being dragged (middle mouse), swallow key presses (E, Q, number keys...)
         // so they don't close the inventory or drop items. Escape still works.
-        ScreenKeyboardEvents.allowKeyPress(screen).register((currentScreen, keyEvent) ->
-            activeDragWindow == null || keyEvent.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE);
+        ScreenKeyboardEvents.allowKeyPress(screen).register((currentScreen, keyEvent) -> {
+            if (activeDragWindow != null && keyEvent.key() != org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+                return false;
+            }
+            if (activeInventoryTab == InventoryTabView.MINE_CAD
+                && tabs[1] != null
+                && tabs[1].isSelectedTab()
+                && focusedKeybindField != null
+                && focusedKeybindField.handleKeyPress(keyEvent.key())) {
+                if (!focusedKeybindField.isAwaitingInput()) {
+                    setFocusedKeybindField(null);
+                }
+                return false;
+            }
+            if (activeInventoryTab == InventoryTabView.MINE_CAD
+                && tabs[1] != null
+                && tabs[1].isSelectedTab()
+                && focusedTextField != null
+                && focusedTextField.handleKeyPress(keyEvent.key())) {
+                return false;
+            }
+            return true;
+        });
         ScreenKeyboardEvents.allowKeyRelease(screen).register((currentScreen, keyEvent) ->
             activeDragWindow == null);
         ScreenMouseEvents.allowMouseClick(screen).register((currentScreen, event) -> {
+            if (activeInventoryTab == InventoryTabView.MINE_CAD
+                && tabs[1] != null
+                && tabs[1].isSelectedTab()
+                && focusedKeybindField != null
+                && focusedKeybindField.captureMouseButton(event.button())) {
+                setFocusedKeybindField(null);
+                return false;
+            }
+
             int[] b = bounds(currentScreen, backgroundWidth, backgroundHeight);
 
             // Check if the click is inside the MineCad tab window area and if the MineCad tab is selected.
@@ -113,7 +145,14 @@ public final class InventoryTabManager {
                     activeDragButton = event.button();
                 }
                 // Tell the window chain about the click (topmost window under the cursor gets it).
-                window.dispatchClick(b[0], b[1], event.x(), event.y(), event.button());
+                InventoryTabWindow clicked = window.dispatchClick(b[0], b[1], event.x(), event.y(), event.button());
+                if (event.button() == 0) {
+                    setFocusedTextField(clicked instanceof InventoryTabWindowTextField textField ? textField : null);
+                    setFocusedKeybindField(clicked instanceof InventoryTabWindowKeybindField keybindField ? keybindField : null);
+                }
+            } else if (event.button() == 0) {
+                setFocusedTextField(null);
+                setFocusedKeybindField(null);
             }
             return !blocked;
         });
@@ -140,6 +179,15 @@ public final class InventoryTabManager {
             return !isWindowInteractionBlocked(tabs[1], window, event.x(), event.y(), b[0], b[1]);
         });
         ScreenMouseEvents.allowMouseScroll(screen).register((currentScreen, mouseX, mouseY, horizontalAmount, verticalAmount) -> {
+            if (activeInventoryTab == InventoryTabView.MINE_CAD
+                && tabs[1] != null
+                && tabs[1].isSelectedTab()
+                && focusedKeybindField != null
+                && focusedKeybindField.captureMouseScroll()) {
+                setFocusedKeybindField(null);
+                return false;
+            }
+
             int[] b = bounds(currentScreen, backgroundWidth, backgroundHeight);
             boolean blocked = isWindowInteractionBlocked(tabs[1], window, mouseX, mouseY, b[0], b[1]);
             if (blocked) {
@@ -205,6 +253,8 @@ public final class InventoryTabManager {
     private void setActiveInventoryTab(InventoryTabView view, InventoryTab inventoryTab, InventoryTab mineCadTab) {
         if (view != InventoryTabView.MINE_CAD) {
             cancelActiveDrag();
+            setFocusedTextField(null);
+            setFocusedKeybindField(null);
         }
         activeInventoryTab = view;
         syncOverlayState();
@@ -222,6 +272,32 @@ public final class InventoryTabManager {
             activeDragWindow.endMouseDrag(activeDragButton);
             activeDragWindow = null;
             activeDragButton = -1;
+        }
+    }
+
+    private void setFocusedTextField(InventoryTabWindowTextField textField) {
+        if (focusedTextField == textField) {
+            return;
+        }
+        if (focusedTextField != null) {
+            focusedTextField.setFocused(false);
+        }
+        focusedTextField = textField;
+        if (focusedTextField != null) {
+            focusedTextField.setFocused(true);
+        }
+    }
+
+    private void setFocusedKeybindField(InventoryTabWindowKeybindField keybindField) {
+        if (focusedKeybindField == keybindField) {
+            return;
+        }
+        if (focusedKeybindField != null) {
+            focusedKeybindField.setFocused(false);
+        }
+        focusedKeybindField = keybindField;
+        if (focusedKeybindField != null) {
+            focusedKeybindField.setFocused(true);
         }
     }
 

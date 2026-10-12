@@ -31,6 +31,15 @@ and then within the `Selection Settings` of the `3D Tab`, select `Fill Scan`. `F
 Here is an example of a 1m³ sized block in Blender compared to our exported object that also has a 1m³ relative block size.
 ![1 meter comparison in Blender](src/images/1m_comparison_blender.png)
 
+## Future Plans for MineCAD
+There are lots of features I would like to eventually add to MineCAD. 
+A few of those features include: 
+- Export block textures alongside the 3D models.
+- Some sort of in-game measuring tool to use with the active selection.
+- Save and load block scans.
+There are of course many more, but these are currently my highest priorities.
+Also, more documentation to come soon! 
+
 ## Requirements
 
 - Minecraft: `~26.2` (as configured in this project)

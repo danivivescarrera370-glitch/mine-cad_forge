@@ -22,12 +22,12 @@ MineCad can of course also be used to export regular builds to the variety of 3D
 Using MineCad is relatively simple, while there are a variety of ways to make a block selection, the simplest of ways is to use the wand tool.
 With the wand tool you can either individually select all the blocks you want to add, or you can highlight the edges and corners of the entire body of the selection that you want to add,
 and then within the Selection Settings of the 3D Tab, select Fill Scan. Fill Scan will calculate the volume between the selected points and add every block within that volume.
-<img src="images/step_1_example.png" alt="MineCad preview step 1" width="700" />
-<img src="images/step_2_example.png" alt="MineCad preview step 2" width="700" />
-<img src="images/step_2_example.png" alt="MineCad preview step 2" width="700" />
+![MineCad preview step 1](src/images/step_1_example.png)
+![MineCad preview step 2](src/images/step_2_example.png)
+![MineCad preview step 3](src/images/step_3_example.png)
 
 Here is an example of a 1m² block in blender compared to our exported object that also has a 1m² relative block size.
-<img src="images/1m_comparison_blender.png" alt="1 meter comparison in Blender" width="700" />
+![1 meter comparison in Blender](src/images/1m_comparison_blender.png)
 
 ## Requirements
 

@@ -416,6 +416,8 @@ public class MineCadClient implements ClientModInitializer {
 				"3d_viewport_settings.camera_acceleration_factor",
 				"3d_viewport_settings.max_render_blocks",
 				"3d_viewport_settings.interactive_render_blocks",
+				"3d_viewport_settings.hard_block_limit",
+				"3d_viewport_settings.full_detail_when_idle",
 				"keybinds.toggle_outline",
 				"keybinds.3d_viewport_camera_rotation",
 				"keybinds.3d_viewport_camera_zoom",

@@ -1,8 +1,12 @@
 package name.minecad.client.export;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -13,7 +17,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
+/**
+ * Exports the selection to OBJ / STL / FBX. Faces are generated lazily and streamed straight to disk through a
+ * buffered writer, so memory use stays flat regardless of selection size.
+ */
 public final class SelectionExporter {
+    private static final int WRITE_BUFFER_CHARS = 1 << 16;
+
     private SelectionExporter() {
     }
 
@@ -70,347 +80,347 @@ public final class SelectionExporter {
             return new ExportResult(false, "Invalid scale. Meters per block must be a positive number.", null, 0);
         }
 
-        MeshData meshData = buildMeshData(level, blocks, metersPerBlock);
-        if (meshData.faces().isEmpty()) {
+        MeshSource source = MeshSource.create(level, blocks, metersPerBlock);
+        final int faceCount;
+        try {
+            faceCount = source.countFaces();
+        } catch (IOException e) {
+            return new ExportResult(false, "Failed to build mesh: " + e.getMessage(), null, 0);
+        }
+        if (faceCount == 0) {
             return new ExportResult(false, "Selection has no visible block faces to export.", null, 0);
         }
 
-        String serialized;
+        Path tempFile = null;
         try {
-            serialized = switch (format) {
-                case OBJ -> writeObj(meshData, outputFile.getFileName().toString());
-                case STL -> writeStl(meshData, outputFile.getFileName().toString());
-                case FBX -> writeFbx(meshData, outputFile.getFileName().toString());
-            };
-        } catch (RuntimeException e) {
-            return new ExportResult(false, "Failed to build " + format.name() + " data: " + e.getMessage(), null, 0);
-        }
-
-        try {
-            Path parent = outputFile.getParent();
+            Path parent = outputFile.toAbsolutePath().getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(outputFile, serialized);
+            tempFile = Files.createTempFile(parent, "minecad-export-", ".tmp");
+
+            String meshName = outputFile.getFileName().toString();
+            try (Writer writer = new BufferedWriter(
+                    Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8), WRITE_BUFFER_CHARS)) {
+                switch (format) {
+                    case OBJ -> writeObj(writer, source, meshName);
+                    case STL -> writeStl(writer, source, meshName);
+                    case FBX -> writeFbx(writer, source, meshName, faceCount);
+                }
+            }
+
+            Files.move(tempFile, outputFile, StandardCopyOption.REPLACE_EXISTING);
+            tempFile = null;
             return new ExportResult(true,
-                    "Exported " + blocks.size() + " block(s), " + meshData.faces().size() + " mesh face(s) to " + outputFile.getFileName(),
+                    "Exported " + blocks.size() + " block(s), " + faceCount + " mesh face(s) to " + outputFile.getFileName(),
                     outputFile,
-                    meshData.faces().size());
-        } catch (IOException e) {
+                    faceCount);
+        } catch (IOException | RuntimeException e) {
             return new ExportResult(false, "Failed to write export file: " + e.getMessage(), null, 0);
+        } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ignored) {
+                    // best effort cleanup
+                }
+            }
         }
     }
 
-    private static MeshData buildMeshData(Level level, List<ScannedBlock> blocks, double scale) {
-        int minX = Integer.MAX_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        List<BlockPos> positions = new ArrayList<>(blocks.size());
+    // ------------------------------------------------------------------ mesh source (lazy)
 
-        for (ScannedBlock block : blocks) {
-            if (block == null || block.pos == null) {
-                continue;
-            }
-            BlockPos pos = block.pos;
-            positions.add(pos);
-            minX = Math.min(minX, pos.getX());
-            minY = Math.min(minY, pos.getY());
-            minZ = Math.min(minZ, pos.getZ());
-        }
-
-        if (positions.isEmpty()) {
-            return new MeshData(List.of());
-        }
-
-        List<FaceInstance> faces = new ArrayList<>();
-        for (BlockPos pos : positions) {
-            BlockState state = level.getBlockState(pos);
-            if (state.isAir()) {
-                continue;
-            }
-            VoxelShape shape = state.getShape(level, pos);
-            List<AABB> boxes = shape.isEmpty() ? List.of(new AABB(0, 0, 0, 1, 1, 1)) : shape.toAabbs();
-
-            double baseX = (pos.getX() - minX) * scale;
-            double baseY = (pos.getY() - minY) * scale;
-            double baseZ = (pos.getZ() - minZ) * scale;
-
-            for (AABB box : boxes) {
-                addBoxFaces(
-                        faces,
-                        baseX + box.minX * scale,
-                        baseY + box.minY * scale,
-                        baseZ + box.minZ * scale,
-                        baseX + box.maxX * scale,
-                        baseY + box.maxY * scale,
-                        baseZ + box.maxZ * scale
-                );
-            }
-        }
-        return new MeshData(faces);
+    @FunctionalInterface
+    private interface FaceConsumer {
+        void accept(FaceInstance face) throws IOException;
     }
 
-    private static void addBoxFaces(List<FaceInstance> faces,
-                                    double minX, double minY, double minZ,
-                                    double maxX, double maxY, double maxZ) {
+    private record MeshSource(Level level, List<BlockPos> positions, int minX, int minY, int minZ, double scale) {
+        static MeshSource create(Level level, List<ScannedBlock> blocks, double scale) {
+            int minX = Integer.MAX_VALUE;
+            int minY = Integer.MAX_VALUE;
+            int minZ = Integer.MAX_VALUE;
+            List<BlockPos> positions = new ArrayList<>(blocks.size());
+            for (ScannedBlock block : blocks) {
+                if (block == null || block.pos == null) {
+                    continue;
+                }
+                BlockPos pos = block.pos;
+                positions.add(pos);
+                minX = Math.min(minX, pos.getX());
+                minY = Math.min(minY, pos.getY());
+                minZ = Math.min(minZ, pos.getZ());
+            }
+            return new MeshSource(level, positions, minX, minY, minZ, scale);
+        }
+
+        int countFaces() throws IOException {
+            int[] count = {0};
+            forEachFace(face -> count[0]++);
+            return count[0];
+        }
+
+        void forEachFace(FaceConsumer consumer) throws IOException {
+            for (BlockPos pos : positions) {
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir()) {
+                    continue;
+                }
+                VoxelShape shape = state.getShape(level, pos);
+                List<AABB> boxes = shape.isEmpty() ? List.of(new AABB(0, 0, 0, 1, 1, 1)) : shape.toAabbs();
+
+                double baseX = (pos.getX() - minX) * scale;
+                double baseY = (pos.getY() - minY) * scale;
+                double baseZ = (pos.getZ() - minZ) * scale;
+
+                for (AABB box : boxes) {
+                    emitBoxFaces(consumer,
+                            baseX + box.minX * scale,
+                            baseY + box.minY * scale,
+                            baseZ + box.minZ * scale,
+                            baseX + box.maxX * scale,
+                            baseY + box.maxY * scale,
+                            baseZ + box.maxZ * scale);
+                }
+            }
+        }
+    }
+
+    private static void emitBoxFaces(FaceConsumer out,
+                                     double minX, double minY, double minZ,
+                                     double maxX, double maxY, double maxZ) throws IOException {
         if (maxX <= minX || maxY <= minY || maxZ <= minZ) {
             return;
         }
 
         // -X
-        faces.add(new FaceInstance(
+        out.accept(new FaceInstance(
                 new Vec3(minX, minY, minZ),
                 new Vec3(minX, minY, maxZ),
                 new Vec3(minX, maxY, maxZ),
                 new Vec3(minX, maxY, minZ),
-                new Vec3(-1, 0, 0)
-        ));
+                new Vec3(-1, 0, 0)));
         // +X
-        faces.add(new FaceInstance(
+        out.accept(new FaceInstance(
                 new Vec3(maxX, minY, maxZ),
                 new Vec3(maxX, minY, minZ),
                 new Vec3(maxX, maxY, minZ),
                 new Vec3(maxX, maxY, maxZ),
-                new Vec3(1, 0, 0)
-        ));
+                new Vec3(1, 0, 0)));
         // -Y
-        faces.add(new FaceInstance(
+        out.accept(new FaceInstance(
                 new Vec3(minX, minY, maxZ),
                 new Vec3(minX, minY, minZ),
                 new Vec3(maxX, minY, minZ),
                 new Vec3(maxX, minY, maxZ),
-                new Vec3(0, -1, 0)
-        ));
+                new Vec3(0, -1, 0)));
         // +Y
-        faces.add(new FaceInstance(
+        out.accept(new FaceInstance(
                 new Vec3(minX, maxY, minZ),
                 new Vec3(minX, maxY, maxZ),
                 new Vec3(maxX, maxY, maxZ),
                 new Vec3(maxX, maxY, minZ),
-                new Vec3(0, 1, 0)
-        ));
+                new Vec3(0, 1, 0)));
         // -Z
-        faces.add(new FaceInstance(
+        out.accept(new FaceInstance(
                 new Vec3(maxX, minY, minZ),
                 new Vec3(minX, minY, minZ),
                 new Vec3(minX, maxY, minZ),
                 new Vec3(maxX, maxY, minZ),
-                new Vec3(0, 0, -1)
-        ));
+                new Vec3(0, 0, -1)));
         // +Z
-        faces.add(new FaceInstance(
+        out.accept(new FaceInstance(
                 new Vec3(minX, minY, maxZ),
                 new Vec3(maxX, minY, maxZ),
                 new Vec3(maxX, maxY, maxZ),
                 new Vec3(minX, maxY, maxZ),
-                new Vec3(0, 0, 1)
-        ));
+                new Vec3(0, 0, 1)));
     }
 
-    private static String writeObj(MeshData meshData, String meshName) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("# MineCad selection export\n");
-        sb.append("# Units: meters (1 unit = 1 m)\n");
-        sb.append("o ").append(sanitizeMeshName(meshName)).append('\n');
+    // ------------------------------------------------------------------ OBJ
 
-        int vertexIndex = 1;
-        for (FaceInstance face : meshData.faces()) {
-            appendObjVertex(sb, face.v0());
-            appendObjVertex(sb, face.v1());
-            appendObjVertex(sb, face.v2());
-            appendObjVertex(sb, face.v3());
-            sb.append("f ")
-                    .append(vertexIndex).append(' ')
-                    .append(vertexIndex + 1).append(' ')
-                    .append(vertexIndex + 2).append(' ')
-                    .append(vertexIndex + 3).append('\n');
-            vertexIndex += 4;
-        }
+    private static void writeObj(Writer w, MeshSource source, String meshName) throws IOException {
+        w.write("# MineCad selection export\n");
+        w.write("# Units: meters (1 unit = 1 m)\n");
+        w.write("o " + sanitizeMeshName(meshName) + "\n");
 
-        return sb.toString();
+        int[] vertexIndex = {1};
+        source.forEachFace(face -> {
+            writeObjVertex(w, face.v0());
+            writeObjVertex(w, face.v1());
+            writeObjVertex(w, face.v2());
+            writeObjVertex(w, face.v3());
+            int i = vertexIndex[0];
+            w.write("f " + i + " " + (i + 1) + " " + (i + 2) + " " + (i + 3) + "\n");
+            vertexIndex[0] += 4;
+        });
     }
 
-    private static void appendObjVertex(StringBuilder sb, Vec3 vertex) {
-        sb.append("v ")
-                .append(formatDouble(vertex.x())).append(' ')
-                .append(formatDouble(vertex.y())).append(' ')
-                .append(formatDouble(vertex.z())).append('\n');
+    private static void writeObjVertex(Writer w, Vec3 v) throws IOException {
+        w.write("v " + formatDouble(v.x()) + " " + formatDouble(v.y()) + " " + formatDouble(v.z()) + "\n");
     }
 
-    private static String writeStl(MeshData meshData, String meshName) {
+    // ------------------------------------------------------------------ STL
+
+    private static void writeStl(Writer w, MeshSource source, String meshName) throws IOException {
         String name = sanitizeMeshName(meshName);
-        StringBuilder sb = new StringBuilder();
-        sb.append("solid ").append(name).append('\n');
-
-        for (FaceInstance face : meshData.faces()) {
-            appendStlFacet(sb, face.normal(), face.v0(), face.v1(), face.v2());
-            appendStlFacet(sb, face.normal(), face.v0(), face.v2(), face.v3());
-        }
-
-        sb.append("endsolid ").append(name).append('\n');
-        return sb.toString();
+        w.write("solid " + name + "\n");
+        source.forEachFace(face -> {
+            writeStlFacet(w, face.normal(), face.v0(), face.v1(), face.v2());
+            writeStlFacet(w, face.normal(), face.v0(), face.v2(), face.v3());
+        });
+        w.write("endsolid " + name + "\n");
     }
 
-    private static void appendStlFacet(StringBuilder sb, Vec3 normal, Vec3 a, Vec3 b, Vec3 c) {
-        sb.append("  facet normal ")
-                .append(formatDouble(normal.x())).append(' ')
-                .append(formatDouble(normal.y())).append(' ')
-                .append(formatDouble(normal.z())).append('\n');
-        sb.append("    outer loop\n");
-        appendStlVertex(sb, a);
-        appendStlVertex(sb, b);
-        appendStlVertex(sb, c);
-        sb.append("    endloop\n");
-        sb.append("  endfacet\n");
+    private static void writeStlFacet(Writer w, Vec3 normal, Vec3 a, Vec3 b, Vec3 c) throws IOException {
+        w.write("  facet normal " + formatDouble(normal.x()) + " " + formatDouble(normal.y()) + " "
+                + formatDouble(normal.z()) + "\n");
+        w.write("    outer loop\n");
+        writeStlVertex(w, a);
+        writeStlVertex(w, b);
+        writeStlVertex(w, c);
+        w.write("    endloop\n");
+        w.write("  endfacet\n");
     }
 
-    private static void appendStlVertex(StringBuilder sb, Vec3 vertex) {
+    private static void writeStlVertex(Writer w, Vec3 v) throws IOException {
         // STL has no unit field and slicers (Cura, PrusaSlicer...) read values as millimetres,
         // so the metre-based mesh is written in millimetres.
-        sb.append("      vertex ")
-                .append(formatDouble(vertex.x() * 1000.0D)).append(' ')
-                .append(formatDouble(vertex.y() * 1000.0D)).append(' ')
-                .append(formatDouble(vertex.z() * 1000.0D)).append('\n');
+        w.write("      vertex " + formatDouble(v.x() * 1000.0D) + " " + formatDouble(v.y() * 1000.0D) + " "
+                + formatDouble(v.z() * 1000.0D) + "\n");
     }
 
-    private static String writeFbx(MeshData meshData, String meshName) {
-        List<Double> vertices = new ArrayList<>();
-        List<Integer> polygonVertexIndex = new ArrayList<>();
-        List<Double> normals = new ArrayList<>();
+    // ------------------------------------------------------------------ FBX
 
-        int nextVertexIndex = 0;
-        for (FaceInstance face : meshData.faces()) {
-            addVertex(vertices, face.v0());
-            addVertex(vertices, face.v1());
-            addVertex(vertices, face.v2());
-            addVertex(vertices, face.v3());
-
-            polygonVertexIndex.add(nextVertexIndex);
-            polygonVertexIndex.add(nextVertexIndex + 1);
-            polygonVertexIndex.add(nextVertexIndex + 2);
-            polygonVertexIndex.add(-(nextVertexIndex + 4));
-            nextVertexIndex += 4;
-
-            for (int i = 0; i < 4; i++) {
-                normals.add(face.normal().x());
-                normals.add(face.normal().y());
-                normals.add(face.normal().z());
-            }
-        }
-
-        StringBuilder sb = new StringBuilder();
+    private static void writeFbx(Writer w, MeshSource source, String meshName, int faceCount) throws IOException {
         String safeName = sanitizeMeshName(meshName);
+        long vertexValues = (long) faceCount * 12L;
+        long indexValues = (long) faceCount * 4L;
+        long normalValues = (long) faceCount * 12L;
 
-        sb.append("; FBX 7.4.0 project file\n");
-        sb.append("FBXHeaderExtension:  {\n");
-        sb.append("  FBXHeaderVersion: 1003\n");
-        sb.append("  FBXVersion: 7400\n");
-        sb.append("}\n");
-        sb.append("GlobalSettings:  {\n");
-        sb.append("  Version: 1000\n");
-        sb.append("  Properties70:  {\n");
-        sb.append("    P: \"UpAxis\", \"int\", \"Integer\", \"\",1\n");
-        sb.append("    P: \"UpAxisSign\", \"int\", \"Integer\", \"\",1\n");
-        sb.append("    P: \"FrontAxis\", \"int\", \"Integer\", \"\",2\n");
-        sb.append("    P: \"FrontAxisSign\", \"int\", \"Integer\", \"\",1\n");
-        sb.append("    P: \"CoordAxis\", \"int\", \"Integer\", \"\",0\n");
-        sb.append("    P: \"CoordAxisSign\", \"int\", \"Integer\", \"\",1\n");
+        w.write("; FBX 7.4.0 project file\n");
+        w.write("FBXHeaderExtension:  {\n");
+        w.write("  FBXHeaderVersion: 1003\n");
+        w.write("  FBXVersion: 7400\n");
+        w.write("}\n");
+        w.write("GlobalSettings:  {\n");
+        w.write("  Version: 1000\n");
+        w.write("  Properties70:  {\n");
+        w.write("    P: \"UpAxis\", \"int\", \"Integer\", \"\",1\n");
+        w.write("    P: \"UpAxisSign\", \"int\", \"Integer\", \"\",1\n");
+        w.write("    P: \"FrontAxis\", \"int\", \"Integer\", \"\",2\n");
+        w.write("    P: \"FrontAxisSign\", \"int\", \"Integer\", \"\",1\n");
+        w.write("    P: \"CoordAxis\", \"int\", \"Integer\", \"\",0\n");
+        w.write("    P: \"CoordAxisSign\", \"int\", \"Integer\", \"\",1\n");
         // Geometry is in metres; FBX unit scale factor is centimetres per unit, so 1 unit = 100 cm.
-        sb.append("    P: \"UnitScaleFactor\", \"double\", \"Number\", \"\",100\n");
-        sb.append("    P: \"OriginalUnitScaleFactor\", \"double\", \"Number\", \"\",100\n");
-        sb.append("  }\n");
-        sb.append("}\n");
-        sb.append("Objects:  {\n");
-        sb.append("  Geometry: 1, \"Geometry::").append(safeName).append("\", \"Mesh\" {\n");
-        sb.append("    Vertices: *").append(vertices.size()).append(" {\n");
-        sb.append("      a: ").append(joinDoubles(vertices)).append('\n');
-        sb.append("    }\n");
-        sb.append("    PolygonVertexIndex: *").append(polygonVertexIndex.size()).append(" {\n");
-        sb.append("      a: ").append(joinInts(polygonVertexIndex)).append('\n');
-        sb.append("    }\n");
-        sb.append("    GeometryVersion: 124\n");
-        sb.append("    LayerElementNormal: 0 {\n");
-        sb.append("      Version: 101\n");
-        sb.append("      Name: \"\"\n");
-        sb.append("      MappingInformationType: \"ByPolygonVertex\"\n");
-        sb.append("      ReferenceInformationType: \"Direct\"\n");
-        sb.append("      Normals: *").append(normals.size()).append(" {\n");
-        sb.append("        a: ").append(joinDoubles(normals)).append('\n');
-        sb.append("      }\n");
-        sb.append("    }\n");
-        sb.append("    LayerElementMaterial: 0 {\n");
-        sb.append("      Version: 101\n");
-        sb.append("      Name: \"\"\n");
-        sb.append("      MappingInformationType: \"AllSame\"\n");
-        sb.append("      ReferenceInformationType: \"IndexToDirect\"\n");
-        sb.append("      Materials: *1 {\n");
-        sb.append("        a: 0\n");
-        sb.append("      }\n");
-        sb.append("    }\n");
-        sb.append("    Layer: 0 {\n");
-        sb.append("      Version: 100\n");
-        sb.append("      LayerElement:  {\n");
-        sb.append("        Type: \"LayerElementNormal\"\n");
-        sb.append("        TypedIndex: 0\n");
-        sb.append("      }\n");
-        sb.append("      LayerElement:  {\n");
-        sb.append("        Type: \"LayerElementMaterial\"\n");
-        sb.append("        TypedIndex: 0\n");
-        sb.append("      }\n");
-        sb.append("    }\n");
-        sb.append("  }\n");
-        sb.append("  Model: 2, \"Model::").append(safeName).append("\", \"Mesh\" {\n");
-        sb.append("    Version: 232\n");
-        sb.append("    Properties70:  {\n");
-        sb.append("      P: \"InheritType\", \"enum\", \"\", \"\",1\n");
-        sb.append("    }\n");
-        sb.append("  }\n");
-        sb.append("  Material: 3, \"Material::MineCadMaterial\", \"\" {\n");
-        sb.append("    Version: 102\n");
-        sb.append("    ShadingModel: \"phong\"\n");
-        sb.append("    MultiLayer: 0\n");
-        sb.append("    Properties70:  {\n");
-        sb.append("      P: \"DiffuseColor\", \"Color\", \"\", \"A\",0.7,0.7,0.7\n");
-        sb.append("    }\n");
-        sb.append("  }\n");
-        sb.append("}\n");
-        sb.append("Connections:  {\n");
-        sb.append("  C: \"OO\",1,0\n");
-        sb.append("  C: \"OO\",2,0\n");
-        sb.append("  C: \"OO\",2,1\n");
-        sb.append("  C: \"OO\",3,2\n");
-        sb.append("}\n");
+        w.write("    P: \"UnitScaleFactor\", \"double\", \"Number\", \"\",100\n");
+        w.write("    P: \"OriginalUnitScaleFactor\", \"double\", \"Number\", \"\",100\n");
+        w.write("  }\n");
+        w.write("}\n");
+        w.write("Objects:  {\n");
+        w.write("  Geometry: 1, \"Geometry::" + safeName + "\", \"Mesh\" {\n");
 
-        return sb.toString();
-    }
+        // Vertices (pass 1)
+        w.write("    Vertices: *" + vertexValues + " {\n");
+        w.write("      a: ");
+        boolean[] first = {true};
+        source.forEachFace(face -> {
+            writeFbxVertex(w, face.v0(), first);
+            writeFbxVertex(w, face.v1(), first);
+            writeFbxVertex(w, face.v2(), first);
+            writeFbxVertex(w, face.v3(), first);
+        });
+        w.write("\n    }\n");
 
-    private static void addVertex(List<Double> vertices, Vec3 vertex) {
-        vertices.add(vertex.x());
-        vertices.add(vertex.y());
-        vertices.add(vertex.z());
-    }
-
-    private static String joinDoubles(List<Double> values) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) {
-                sb.append(',');
+        // Polygon indices are purely arithmetic - no need to touch the world again.
+        w.write("    PolygonVertexIndex: *" + indexValues + " {\n");
+        w.write("      a: ");
+        for (int face = 0; face < faceCount; face++) {
+            long base = (long) face * 4L;
+            if (face > 0) {
+                w.write(",");
             }
-            sb.append(formatDouble(values.get(i)));
+            w.write(base + "," + (base + 1) + "," + (base + 2) + "," + (-(base + 3) - 1));
         }
-        return sb.toString();
+        w.write("\n    }\n");
+
+        w.write("    GeometryVersion: 124\n");
+        w.write("    LayerElementNormal: 0 {\n");
+        w.write("      Version: 101\n");
+        w.write("      Name: \"\"\n");
+        w.write("      MappingInformationType: \"ByPolygonVertex\"\n");
+        w.write("      ReferenceInformationType: \"Direct\"\n");
+
+        // Normals (pass 2)
+        w.write("      Normals: *" + normalValues + " {\n");
+        w.write("        a: ");
+        first[0] = true;
+        source.forEachFace(face -> {
+            String n = formatDouble(face.normal().x()) + "," + formatDouble(face.normal().y()) + ","
+                    + formatDouble(face.normal().z());
+            for (int i = 0; i < 4; i++) {
+                if (!first[0]) {
+                    w.write(",");
+                }
+                first[0] = false;
+                w.write(n);
+            }
+        });
+        w.write("\n      }\n");
+        w.write("    }\n");
+        w.write("    LayerElementMaterial: 0 {\n");
+        w.write("      Version: 101\n");
+        w.write("      Name: \"\"\n");
+        w.write("      MappingInformationType: \"AllSame\"\n");
+        w.write("      ReferenceInformationType: \"IndexToDirect\"\n");
+        w.write("      Materials: *1 {\n");
+        w.write("        a: 0\n");
+        w.write("      }\n");
+        w.write("    }\n");
+        w.write("    Layer: 0 {\n");
+        w.write("      Version: 100\n");
+        w.write("      LayerElement:  {\n");
+        w.write("        Type: \"LayerElementNormal\"\n");
+        w.write("        TypedIndex: 0\n");
+        w.write("      }\n");
+        w.write("      LayerElement:  {\n");
+        w.write("        Type: \"LayerElementMaterial\"\n");
+        w.write("        TypedIndex: 0\n");
+        w.write("      }\n");
+        w.write("    }\n");
+        w.write("  }\n");
+        w.write("  Model: 2, \"Model::" + safeName + "\", \"Mesh\" {\n");
+        w.write("    Version: 232\n");
+        w.write("    Properties70:  {\n");
+        w.write("      P: \"InheritType\", \"enum\", \"\", \"\",1\n");
+        w.write("    }\n");
+        w.write("  }\n");
+        w.write("  Material: 3, \"Material::MineCadMaterial\", \"\" {\n");
+        w.write("    Version: 102\n");
+        w.write("    ShadingModel: \"phong\"\n");
+        w.write("    MultiLayer: 0\n");
+        w.write("    Properties70:  {\n");
+        w.write("      P: \"DiffuseColor\", \"Color\", \"\", \"A\",0.7,0.7,0.7\n");
+        w.write("    }\n");
+        w.write("  }\n");
+        w.write("}\n");
+        w.write("Connections:  {\n");
+        w.write("  C: \"OO\",1,0\n");
+        w.write("  C: \"OO\",2,0\n");
+        w.write("  C: \"OO\",2,1\n");
+        w.write("  C: \"OO\",3,2\n");
+        w.write("}\n");
     }
 
-    private static String joinInts(List<Integer> values) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append(values.get(i));
+    private static void writeFbxVertex(Writer w, Vec3 v, boolean[] first) throws IOException {
+        if (!first[0]) {
+            w.write(",");
         }
-        return sb.toString();
+        first[0] = false;
+        w.write(formatDouble(v.x()) + "," + formatDouble(v.y()) + "," + formatDouble(v.z()));
     }
+
+    // ------------------------------------------------------------------ helpers
 
     private static String sanitizeMeshName(String raw) {
         if (raw == null || raw.isBlank()) {
@@ -422,10 +432,6 @@ public final class SelectionExporter {
     private static String formatDouble(double value) {
         return String.format(Locale.ROOT, "%.9f", value);
     }
-
-    private record MeshData(List<FaceInstance> faces) {
-    }
-
 
     private record FaceInstance(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 v3, Vec3 normal) {
     }

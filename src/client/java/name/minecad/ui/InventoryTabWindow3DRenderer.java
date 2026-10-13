@@ -56,6 +56,8 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   private double lastOffsetY = Double.NaN;
   private float lastScale = Float.NaN;
   private long lastViewChangeNanos = Long.MIN_VALUE / 2;
+  private long lastRenderNanos = Long.MIN_VALUE / 2;
+  private static final long REDRAW_GAP_NANOS = 100_000_000L;
 
   private float defaultRotation;
   private float defaultXPosition;
@@ -292,6 +294,11 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     // While the view is changing every frame is a full re-render, so draw the cheaper coarse preview
     // of the scene; once the view has been still for a moment the full scene is rendered one more time.
     long now = System.nanoTime();
+    // The view was not drawn for a while (another tab was open): do not trust the cached picture.
+    if (now - lastRenderNanos > REDRAW_GAP_NANOS) {
+      scene.invalidate();
+    }
+    lastRenderNanos = now;
     if (yawDegrees != lastYaw || pitchDegrees != lastPitch || offsetX != lastOffsetX
         || offsetY != lastOffsetY || scale != lastScale) {
       lastYaw = yawDegrees;

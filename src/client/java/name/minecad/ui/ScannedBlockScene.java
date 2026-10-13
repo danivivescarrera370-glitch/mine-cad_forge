@@ -74,7 +74,10 @@ public class ScannedBlockScene {
   private int visibleBlockCount;
   private int builtMaxBlocks = -1;
   private int builtInteractiveBlocks = -1;
+  private int builtHardLimit = -1;
+  private boolean builtFullIdle;
   private long buildCounter;
+  private long invalidateCounter;
   private boolean capped;
 
   /**
@@ -180,7 +183,17 @@ public class ScannedBlockScene {
   public long stamp() {
     ClientLevel level = Minecraft.getInstance().level;
     // Uses the revision that was actually built, so deferred state changes do not force a redraw.
-    return builtRevision * 31L + (level == null ? 0 : System.identityHashCode(level)) + buildCounter * 1_000_003L;
+    return builtRevision * 31L + (level == null ? 0 : System.identityHashCode(level)) + buildCounter * 1_000_003L
+        + invalidateCounter * 7_919L;
+  }
+
+  /**
+   * Forces the next frame to be rendered again instead of reusing the cached picture. Needed when
+   * the view was not drawn for a while (e.g. another tab was open), because the cached GPU texture
+   * may no longer hold valid content.
+   */
+  public void invalidate() {
+    invalidateCounter++;
   }
 
   // ---------------------------------------------------------------- scene data
@@ -211,8 +224,11 @@ public class ScannedBlockScene {
     long structure = manager.getStructureRevision();
     int maxBlocks = MineCadSettings.getMaxRenderBlocks();
     int interactiveBlocks = MineCadSettings.getInteractiveRenderBlocks();
+    int hardLimit = MineCadSettings.getHardBlockLimit();
+    boolean fullIdle = MineCadSettings.isFullDetailWhenIdle();
     boolean mustRebuild = !built || builtLevel != level || builtStructureRevision != structure
-        || builtMaxBlocks != maxBlocks || builtInteractiveBlocks != interactiveBlocks;
+        || builtMaxBlocks != maxBlocks || builtInteractiveBlocks != interactiveBlocks
+        || builtHardLimit != hardLimit || builtFullIdle != fullIdle;
     if (!mustRebuild) {
       if (builtRevision == revision) {
         return;
@@ -228,12 +244,15 @@ public class ScannedBlockScene {
     builtLevel = level;
     builtMaxBlocks = maxBlocks;
     builtInteractiveBlocks = interactiveBlocks;
+    builtHardLimit = hardLimit;
+    builtFullIdle = fullIdle;
     buildCounter++;
-    rebuild(level, manager, maxBlocks, interactiveBlocks);
+    rebuild(level, manager, maxBlocks, interactiveBlocks, hardLimit, fullIdle);
     lastBuildNanos = System.nanoTime();
   }
 
-  private void rebuild(ClientLevel level, ScannedBlockManager manager, int maxBlocks, int interactiveBlocks) {
+  private void rebuild(ClientLevel level, ScannedBlockManager manager, int maxBlocks, int interactiveBlocks,
+                       int hardLimit, boolean fullIdle) {
     blocks.clear();
     lodBlocks.clear();
     partsCache.clear();
@@ -304,11 +323,13 @@ public class ScannedBlockScene {
     }
     visibleBlockCount = preview.size();
 
-    // Culling pass 2: respect the max render blocks setting with a deterministic subset.
-    if (preview.size() > maxBlocks) {
+    // Culling pass 2: optional hard block limit setting (0 = unlimited, the default). Above it a
+    // deterministic subset is kept. The max render blocks limit does not drop blocks; it merges the
+    // scene into coarser cubes below (dropping blocks would leave see-through holes in the surface).
+    if (hardLimit > 0 && preview.size() > hardLimit) {
       capped = true;
       preview.sort(Comparator.comparingInt(block -> positionHash(block.pos())));
-      preview = new ArrayList<>(preview.subList(0, maxBlocks));
+      preview = new ArrayList<>(preview.subList(0, hardLimit));
     }
 
     // Occlusion is decided against the blocks that are really drawn (plus the buried ones that
@@ -355,7 +376,75 @@ public class ScannedBlockScene {
           exposedMask, block.full(), rank, state, 1));
     }
 
-    buildLod(interactiveBlocks);
+    // Moving-view stand-in first (from the finest data), then shrink the full scene to the limit.
+    lodBlocks.addAll(buildLod(blocks, interactiveBlocks));
+    // With "full detail when idle" the resting view keeps every block and only the moving-view
+    // stand-in is coarse.
+    if (!fullIdle && blocks.size() > maxBlocks) {
+      List<SceneBlock> coarse = buildLod(blocks, maxBlocks);
+      if (!coarse.isEmpty()) {
+        capped = true;
+        blocks.clear();
+        blocks.addAll(coarse);
+      }
+    }
+    if (lodBlocks.size() >= blocks.size()) {
+      lodBlocks.clear(); // not cheaper than the full scene
+    }
+    prewarmFacingParts();
+  }
+
+  /** A block's state together with its exposed faces: the inputs of the per-view face culling. */
+  private record PartKey(BlockState state, int exposedMask) {
+  }
+
+  /**
+   * Builds the back-face-culled part lists of both the full and the coarse scene for every possible
+   * camera facing now (together with the rebuild), so that switching between full and low detail
+   * only swaps which prebuilt block list is submitted and never builds parts during drawing.
+   */
+  private void prewarmFacingParts() {
+    java.util.Set<PartKey> keys = new java.util.HashSet<>();
+    for (SceneBlock block : blocks) {
+      if (block.cullable()) {
+        keys.add(new PartKey(block.state(), block.exposedMask()));
+      }
+    }
+    for (SceneBlock block : lodBlocks) {
+      if (block.cullable()) {
+        keys.add(new PartKey(block.state(), block.exposedMask()));
+      }
+    }
+    if (keys.isEmpty()) {
+      return;
+    }
+
+    int all = (1 << DIRECTIONS.length) - 1;
+    int[][] axisPairs = {
+        {Direction.DOWN.ordinal(), Direction.UP.ordinal()},
+        {Direction.NORTH.ordinal(), Direction.SOUTH.ordinal()},
+        {Direction.WEST.ordinal(), Direction.EAST.ordinal()}};
+    // Per axis a camera sees the negative face, the positive face, or both (almost edge-on).
+    for (int combo = 0; combo < 27; combo++) {
+      int facing = 0;
+      int rest = combo;
+      for (int[] pair : axisPairs) {
+        int choice = rest % 3;
+        rest /= 3;
+        if (choice == 0 || choice == 2) {
+          facing |= 1 << pair[0];
+        }
+        if (choice == 1 || choice == 2) {
+          facing |= 1 << pair[1];
+        }
+      }
+      for (PartKey key : keys) {
+        int visible = key.exposedMask() & facing;
+        if (visible != key.exposedMask()) {
+          culledParts(key.state(), ~visible & all);
+        }
+      }
+    }
   }
 
   /**
@@ -363,14 +452,14 @@ public class ScannedBlockScene {
    * 2, 4, 8, ... blocks per side (one representative block scaled up per cube) until there are at
    * most {@code budget} of them. Unlike dropping random blocks this keeps the shape solid.
    */
-  private void buildLod(int budget) {
-    lodBlocks.clear();
-    if (blocks.size() <= budget) {
-      return;
+  private List<SceneBlock> buildLod(List<SceneBlock> source, int budget) {
+    List<SceneBlock> result = new ArrayList<>();
+    if (source.size() <= budget) {
+      return result;
     }
 
-    List<LodCell> cells = new ArrayList<>(blocks.size());
-    for (SceneBlock block : blocks) {
+    List<LodCell> cells = new ArrayList<>(source.size());
+    for (SceneBlock block : source) {
       cells.add(new LodCell(block.bx(), block.by(), block.bz(), block));
     }
     int level = 0;
@@ -379,7 +468,7 @@ public class ScannedBlockScene {
       level++;
     }
     if (level == 0) {
-      return;
+      return result;
     }
 
     int size = 1 << level;
@@ -408,9 +497,10 @@ public class ScannedBlockScene {
         continue;
       }
       int exposedMask = ~hiddenMask & ((1 << DIRECTIONS.length) - 1);
-      lodBlocks.add(new SceneBlock(cell.cx() * size, cell.cy() * size, cell.cz() * size, parts, rep.tints(),
+      result.add(new SceneBlock(cell.cx() * size, cell.cy() * size, cell.cz() * size, parts, rep.tints(),
           rep.translucent(), exposedMask, rep.cullable(), rep.rank(), rep.state(), size));
     }
+    return result;
   }
 
   /** Merges 2x2x2 cells into one; the representative is a full cube if there is one, else the lowest rank. */

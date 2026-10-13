@@ -29,6 +29,8 @@ public class MineCadSettings {
     private static final int MIN_MAX_RENDER_BLOCKS = 1;
     private static final int MAX_MAX_RENDER_BLOCKS = 5_000_000;
     private static final int DEFAULT_INTERACTIVE_RENDER_BLOCKS = 25_000;
+    /** 0 (or less) means unlimited. */
+    private static final int DEFAULT_HARD_BLOCK_LIMIT = 0;
 
     private static final String DEFAULT_MEASUREMENT_UNIT = "meters";
     private static final int DEFAULT_OUTLINE_COLOR = 0xFFFF0000;
@@ -54,6 +56,8 @@ public class MineCadSettings {
     private double cameraAccelerationFactor = DEFAULT_FACTOR;
     private int maxRenderBlocks = DEFAULT_MAX_RENDER_BLOCKS;
     private int interactiveRenderBlocks = DEFAULT_INTERACTIVE_RENDER_BLOCKS;
+    private int hardBlockLimit = DEFAULT_HARD_BLOCK_LIMIT;
+    private boolean fullDetailWhenIdle = false;
 
     private String keybindToggleOutline = "O";
     private String keybindCameraRotation = "MOUSE_SCROLL_CLICK";
@@ -233,6 +237,25 @@ public class MineCadSettings {
         save();
     }
 
+    /** Hard limit of surface blocks kept in the scene; 0 (or less) means unlimited. */
+    public static synchronized int getHardBlockLimit() {
+        return active.hardBlockLimit;
+    }
+
+    public static synchronized void setHardBlockLimit(int hardBlockLimit) {
+        active.hardBlockLimit = Math.max(0, hardBlockLimit);
+        save();
+    }
+
+    public static synchronized boolean isFullDetailWhenIdle() {
+        return active.fullDetailWhenIdle;
+    }
+
+    public static synchronized void setFullDetailWhenIdle(boolean enabled) {
+        active.fullDetailWhenIdle = enabled;
+        save();
+    }
+
     public static synchronized boolean isWandEnabled() {
         return active.wandEnabled;
     }
@@ -256,6 +279,8 @@ public class MineCadSettings {
             case "3d_viewport_settings.camera_acceleration_factor" -> formatNumber(active.cameraAccelerationFactor);
             case "3d_viewport_settings.max_render_blocks" -> Integer.toString(active.maxRenderBlocks);
             case "3d_viewport_settings.interactive_render_blocks" -> Integer.toString(active.interactiveRenderBlocks);
+            case "3d_viewport_settings.hard_block_limit" -> Integer.toString(active.hardBlockLimit);
+            case "3d_viewport_settings.full_detail_when_idle" -> Boolean.toString(active.fullDetailWhenIdle);
             case "keybinds.toggle_outline" -> active.keybindToggleOutline;
             case "keybinds.3d_viewport_camera_rotation" -> active.keybindCameraRotation;
             case "keybinds.3d_viewport_camera_zoom" -> active.keybindCameraZoom;
@@ -295,6 +320,8 @@ public class MineCadSettings {
             case "3d_viewport_settings.camera_acceleration_factor" -> active.cameraAccelerationFactor = clampFactor(Double.parseDouble(raw));
             case "3d_viewport_settings.max_render_blocks" -> active.maxRenderBlocks = clampMaxRenderBlocks(parseBlockCount(raw));
             case "3d_viewport_settings.interactive_render_blocks" -> active.interactiveRenderBlocks = clampMaxRenderBlocks(parseBlockCount(raw));
+            case "3d_viewport_settings.hard_block_limit" -> active.hardBlockLimit = Math.max(0, parseBlockCount(raw));
+            case "3d_viewport_settings.full_detail_when_idle" -> active.fullDetailWhenIdle = parseBooleanValue(raw);
             case "keybinds.toggle_outline" -> active.keybindToggleOutline = sanitizeText(raw, active.keybindToggleOutline);
             case "keybinds.3d_viewport_camera_rotation" -> active.keybindCameraRotation = sanitizeText(raw, active.keybindCameraRotation);
             case "keybinds.3d_viewport_camera_zoom" -> active.keybindCameraZoom = sanitizeText(raw, active.keybindCameraZoom);
@@ -399,6 +426,8 @@ public class MineCadSettings {
             s.cameraAccelerationFactor = n.viewportSettings.cameraAccelerationFactor;
             s.maxRenderBlocks = n.viewportSettings.maxRenderBlocks;
             s.interactiveRenderBlocks = n.viewportSettings.interactiveRenderBlocks;
+            s.hardBlockLimit = Math.max(0, n.viewportSettings.hardBlockLimit);
+            s.fullDetailWhenIdle = n.viewportSettings.fullDetailWhenIdle;
         }
         if (n.keybinds != null) {
             s.keybindToggleOutline = sanitizeText(n.keybinds.toggleOutline, s.keybindToggleOutline);
@@ -448,6 +477,8 @@ public class MineCadSettings {
         doc.settings.viewportSettings.cameraAccelerationFactor = s.cameraAccelerationFactor;
         doc.settings.viewportSettings.maxRenderBlocks = s.maxRenderBlocks;
         doc.settings.viewportSettings.interactiveRenderBlocks = s.interactiveRenderBlocks;
+        doc.settings.viewportSettings.hardBlockLimit = s.hardBlockLimit;
+        doc.settings.viewportSettings.fullDetailWhenIdle = s.fullDetailWhenIdle;
 
         doc.settings.keybinds = new KeybindsNode();
         doc.settings.keybinds.toggleOutline = s.keybindToggleOutline;
@@ -612,6 +643,10 @@ public class MineCadSettings {
         private int maxRenderBlocks = 100_000;
         @SerializedName("interactive_render_blocks")
         private int interactiveRenderBlocks = 25_000;
+        @SerializedName("hard_block_limit")
+        private int hardBlockLimit = 0;
+        @SerializedName("full_detail_when_idle")
+        private boolean fullDetailWhenIdle = false;
     }
 
     private static class KeybindsNode {

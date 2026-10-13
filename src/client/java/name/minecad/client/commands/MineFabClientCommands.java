@@ -4,7 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import java.util.Locale;
-import name.minecad.ui.MineFabSettings;
+import name.minecad.client.settings.MineCadSettings;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -35,7 +35,7 @@ public final class MineFabClientCommands {
                                 .then(ClientCommands.literal("off")
                                         .executes(context -> setHoveredOutline(context.getSource(), false))))
                         .then(ClientCommands.literal("width")
-                                .then(ClientCommands.argument("value", FloatArgumentType.floatArg(MineFabSettings.getMinStrokeWidth(), MineFabSettings.getMaxStrokeWidth()))
+                                .then(ClientCommands.argument("value", FloatArgumentType.floatArg(MineCadSettings.getMinStrokeWidth(), MineCadSettings.getMaxStrokeWidth()))
                                         .executes(context -> setOutlineWidth(context.getSource(), FloatArgumentType.getFloat(context, "value")))))
                         .then(ClientCommands.literal("color")
                                 .then(ClientCommands.literal("selected")
@@ -51,44 +51,44 @@ public final class MineFabClientCommands {
     private static int sendStatus(FabricClientCommandSource source) {
         source.sendFeedback(Component.literal(
                 "MineCad outline settings:\n" +
-                        "- enabled: " + MineFabSettings.areOutlinesEnabled() + "\n" +
-                        "- hovered outline: " + MineFabSettings.isHoveredOutlineEnabled() + "\n" +
-                        "- selected color: " + MineFabSettings.formatColor(MineFabSettings.getSelectedOutlineColor()) + "\n" +
-                        "- hovered color: " + MineFabSettings.formatColor(MineFabSettings.getHoveredOutlineColor()) + "\n" +
-                        "- stroke width: " + String.format(Locale.ROOT, "%.2f", MineFabSettings.getOutlineStrokeWidth())
+                        "- enabled: " + MineCadSettings.areOutlinesEnabled() + "\n" +
+                        "- hovered outline: " + MineCadSettings.isHoveredOutlineEnabled() + "\n" +
+                        "- selected color: " + MineCadSettings.formatColor(MineCadSettings.getSelectedOutlineColor()) + "\n" +
+                        "- hovered color: " + MineCadSettings.formatColor(MineCadSettings.getHoveredOutlineColor()) + "\n" +
+                        "- stroke width: " + String.format(Locale.ROOT, "%.2f", MineCadSettings.getOutlineStrokeWidth())
         ));
         return 1;
     }
 
     private static int toggleOutlines(FabricClientCommandSource source) {
-        boolean enabled = !MineFabSettings.areOutlinesEnabled();
-        MineFabSettings.setOutlinesEnabled(enabled);
+        boolean enabled = !MineCadSettings.areOutlinesEnabled();
+        MineCadSettings.setOutlinesEnabled(enabled);
         source.sendFeedback(Component.literal("Selection outlines " + (enabled ? "enabled" : "disabled")));
         return 1;
     }
 
     private static int setOutlinesEnabled(FabricClientCommandSource source, boolean enabled) {
-        MineFabSettings.setOutlinesEnabled(enabled);
+        MineCadSettings.setOutlinesEnabled(enabled);
         source.sendFeedback(Component.literal("Selection outlines " + (enabled ? "enabled" : "disabled")));
         return 1;
     }
 
     private static int setHoveredOutline(FabricClientCommandSource source, boolean enabled) {
-        MineFabSettings.setHoveredOutlineEnabled(enabled);
+        MineCadSettings.setHoveredOutlineEnabled(enabled);
         source.sendFeedback(Component.literal("Hovered wand outline " + (enabled ? "enabled" : "disabled")));
         return 1;
     }
 
     private static int setOutlineWidth(FabricClientCommandSource source, float strokeWidth) {
-        MineFabSettings.setOutlineStrokeWidth(strokeWidth);
-        source.sendFeedback(Component.literal("Outline width set to " + String.format(Locale.ROOT, "%.2f", MineFabSettings.getOutlineStrokeWidth())));
+        MineCadSettings.setOutlineStrokeWidth(strokeWidth);
+        source.sendFeedback(Component.literal("Outline width set to " + String.format(Locale.ROOT, "%.2f", MineCadSettings.getOutlineStrokeWidth())));
         return 1;
     }
 
     private static int setSelectedColor(FabricClientCommandSource source, String value) {
         try {
-            MineFabSettings.setSelectedOutlineColor(MineFabSettings.parseColor(value));
-            source.sendFeedback(Component.literal("Selected outline color set to " + MineFabSettings.formatColor(MineFabSettings.getSelectedOutlineColor())));
+            MineCadSettings.setSelectedOutlineColor(MineCadSettings.parseColor(value));
+            source.sendFeedback(Component.literal("Selected outline color set to " + MineCadSettings.formatColor(MineCadSettings.getSelectedOutlineColor())));
             return 1;
         } catch (IllegalArgumentException exception) {
             source.sendError(Component.literal(exception.getMessage()));
@@ -98,8 +98,8 @@ public final class MineFabClientCommands {
 
     private static int setHoveredColor(FabricClientCommandSource source, String value) {
         try {
-            MineFabSettings.setHoveredOutlineColor(MineFabSettings.parseColor(value));
-            source.sendFeedback(Component.literal("Hovered outline color set to " + MineFabSettings.formatColor(MineFabSettings.getHoveredOutlineColor())));
+            MineCadSettings.setHoveredOutlineColor(MineCadSettings.parseColor(value));
+            source.sendFeedback(Component.literal("Hovered outline color set to " + MineCadSettings.formatColor(MineCadSettings.getHoveredOutlineColor())));
             return 1;
         } catch (IllegalArgumentException exception) {
             source.sendError(Component.literal(exception.getMessage()));
@@ -108,7 +108,7 @@ public final class MineFabClientCommands {
     }
 
     private static int resetSettings(FabricClientCommandSource source) {
-        MineFabSettings.resetToDefaults();
+        MineCadSettings.resetToDefaults();
         source.sendFeedback(Component.literal("MineCad outline settings reset to defaults"));
         return sendStatus(source);
     }

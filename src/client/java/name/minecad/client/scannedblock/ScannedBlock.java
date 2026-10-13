@@ -1,4 +1,4 @@
-package name.minecad.scannedblock;
+package name.minecad.client.scannedblock;
 
 import java.util.ArrayList;
 import java.util.List;

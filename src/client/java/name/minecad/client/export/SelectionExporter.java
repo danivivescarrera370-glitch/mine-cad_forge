@@ -1,4 +1,4 @@
-package name.minecad.export;
+package name.minecad.client.export;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import name.minecad.scannedblock.ScannedBlock;
+import name.minecad.client.scannedblock.ScannedBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;

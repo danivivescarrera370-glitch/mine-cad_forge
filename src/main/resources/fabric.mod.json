@@ -13,17 +13,13 @@
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/mine-cad/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
-		"main": [
-			"name.minecad.MineCad"
-		],
 		"client": [
 			"name.minecad.client.MineCadClient"
 		]
 	},
 	"mixins": [
-		"mine-cad.mixins.json",
 		{
 			"config": "mine-cad.client.mixins.json",
 			"environment": "client"

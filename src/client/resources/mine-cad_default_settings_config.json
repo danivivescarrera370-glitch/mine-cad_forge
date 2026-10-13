@@ -46,6 +46,11 @@
         "block_to_unit_scale": 1.0
       },
 
+      "exports":
+      {
+        "output_directory": "minefab_data/exports"
+      },
+
       "wand":
       {
         "enabled": true,

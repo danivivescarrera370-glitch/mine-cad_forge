@@ -1,4 +1,4 @@
-package name.minecad.wand;
+package name.minecad.client.wand;
 
 import net.minecraft.world.item.Item;
 

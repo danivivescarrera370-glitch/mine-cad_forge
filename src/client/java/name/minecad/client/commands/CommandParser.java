@@ -1,4 +1,4 @@
-package name.minecad.player.commands;
+package name.minecad.client.commands;
 
 import java.util.*;
 import java.util.regex.Matcher;

@@ -6,9 +6,10 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import name.minecad.MineCad;
-import name.minecad.scannedblock.ScannedBlock;
-import name.minecad.scannedblock.ScannedBlockManager;
+import name.minecad.client.MineCadClient;
+import name.minecad.client.scannedblock.ScannedBlock;
+import name.minecad.client.scannedblock.ScannedBlockManager;
+import name.minecad.client.settings.MineCadSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -197,7 +198,7 @@ public class ScannedBlockScene {
    */
   public void update(boolean viewBusy) {
     ClientLevel level = Minecraft.getInstance().level;
-    ScannedBlockManager manager = MineCad.getScannedBlockManager();
+    ScannedBlockManager manager = MineCadClient.getScannedBlockManager();
     if (level == null || manager == null) {
       built = false;
       blocks.clear();
@@ -208,8 +209,8 @@ public class ScannedBlockScene {
 
     long revision = manager.getSelectionRevision();
     long structure = manager.getStructureRevision();
-    int maxBlocks = MineFabSettings.getMaxRenderBlocks();
-    int interactiveBlocks = MineFabSettings.getInteractiveRenderBlocks();
+    int maxBlocks = MineCadSettings.getMaxRenderBlocks();
+    int interactiveBlocks = MineCadSettings.getInteractiveRenderBlocks();
     boolean mustRebuild = !built || builtLevel != level || builtStructureRevision != structure
         || builtMaxBlocks != maxBlocks || builtInteractiveBlocks != interactiveBlocks;
     if (!mustRebuild) {

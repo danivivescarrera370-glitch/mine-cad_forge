@@ -1,30 +1,42 @@
 package name.minecad.client;
 
 import java.util.List;
-import name.minecad.MineCad;
+import name.minecad.client.commands.MineCadCommands;
 import name.minecad.client.commands.MineFabClientCommands;
 import name.minecad.client.render.SelectionOutlineRenderer;
-import name.minecad.ui.InventoryTab;
+import name.minecad.client.scannedblock.ScannedBlockManager;
+import name.minecad.client.settings.MineCadSettings;
+import name.minecad.client.wand.Wand;
+import name.minecad.client.wand.WandManager;
 import name.minecad.ui.InventorySideTabButton;
+import name.minecad.ui.InventoryTab;
 import name.minecad.ui.InventoryTabManager;
+import name.minecad.ui.InventoryTabTextPanel;
 import name.minecad.ui.InventoryTabWindow;
 import name.minecad.ui.InventoryTabWindow3DRenderer;
 import name.minecad.ui.InventoryTabWindowButton;
 import name.minecad.ui.InventoryTabWindowKeybindField;
-import name.minecad.ui.InventoryTabTextPanel;
 import name.minecad.ui.InventoryTabWindowTextField;
-import name.minecad.ui.MineFabSettings;
-import name.minecad.ui.ScrollableControlPane;
 import name.minecad.ui.ScenePipRenderer;
+import name.minecad.ui.ScrollableControlPane;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.Items;
 
 public class MineCadClient implements ClientModInitializer {
+
+	public static final String MOD_ID = "mine-cad";
+	private static final ScannedBlockManager scannedBlockManager = new ScannedBlockManager(20);
+	private static final WandManager wandManager = new WandManager(new Wand(Items.STICK), scannedBlockManager);
+
+
+
 	private static InventoryTabManager inventoryTabManager;
 	private static int pendingTabsOffsetX = 200;
 	private static int pendingTabsOffsetY = 0;
@@ -94,16 +106,27 @@ public class MineCadClient implements ClientModInitializer {
 		return inventoryTabManager;
 	}
 
+	public static ScannedBlockManager getScannedBlockManager() {
+		return scannedBlockManager;
+	}
+
+	public static WandManager getWandManager() {
+		return wandManager;
+	}
+
 
 
 	@Override
 	public void onInitializeClient() {
-		MineFabSettings.load();
+		MineCadSettings.load();
+		wandManager.registerEvents();
+		MineCadCommands.initialize(scannedBlockManager, wandManager);
+		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> MineCadCommands.register(dispatcher));
 		MineFabClientCommands.register();
 		SelectionOutlineRenderer.register();
 
 		// delect the selection when the player disconnects from a server or singleplayer world. This way the selection will not carry over to other worlds/maps.
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> MineCad.getScannedBlockManager().deleteSelection());
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> scannedBlockManager.deleteSelection());
 
 		// The 3D preview is drawn by the GPU through the game's picture-in-picture pipeline.
 		PictureInPictureRendererRegistry.register(context -> new ScenePipRenderer());
@@ -209,7 +232,7 @@ public class MineCadClient implements ClientModInitializer {
 				Component.empty(),
 				InventoryTabWindowTextField.InputMode.NUMERIC
 		);
-		scaleField.setText(MineFabSettings.formatNumber(MineFabSettings.getMetersPerBlock()));
+		scaleField.setText(MineCadSettings.formatNumber(MineCadSettings.getMetersPerBlock()));
 		scaleField.setPlaceholder("1");
 		additionalSettingsPane.addScrollableChild(scaleField, scaleLabelWidth + inlineFieldGap, commandY);
 		commandY += 14 + rowGap;
@@ -217,13 +240,13 @@ public class MineCadClient implements ClientModInitializer {
 		setScaleButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Set Scale"), () -> {
 			String value = readOrDefault(scaleField, "1");
 			try {
-				MineFabSettings.setMetersPerBlock(Double.parseDouble(value));
+				MineCadSettings.setMetersPerBlock(Double.parseDouble(value));
 			} catch (NumberFormatException e) {
 				System.out.println("[mine-cad] invalid scale value: " + value);
 				return;
 			}
-			scaleField.setText(MineFabSettings.formatNumber(MineFabSettings.getMetersPerBlock()));
-			runSelectionCommand("selection scale " + MineFabSettings.formatNumber(MineFabSettings.getMetersPerBlock()));
+			scaleField.setText(MineCadSettings.formatNumber(MineCadSettings.getMetersPerBlock()));
+			runSelectionCommand("selection scale " + MineCadSettings.formatNumber(MineCadSettings.getMetersPerBlock()));
 		});
 		setScaleButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(setScaleButton, 0, commandY);
@@ -408,6 +431,7 @@ public class MineCadClient implements ClientModInitializer {
 				"keybinds.3d_viewport_camera_up",
 				"keybinds.3d_viewport_camera_down",
 				"measurements.unit",
+				"exports.output_directory",
 				"wand.enabled",
 				"wand.default_wand_item"
 		};
@@ -441,9 +465,9 @@ public class MineCadClient implements ClientModInitializer {
 		}
 
 		Runnable refreshSettingsFields = () -> {
-			MineFabSettings.load();
+			MineCadSettings.load();
 			for (int i = 0; i < settingKeys.length; i++) {
-				String value = MineFabSettings.getSettingValue(settingKeys[i]);
+				String value = MineCadSettings.getSettingValue(settingKeys[i]);
 				if (keybindFields[i] != null) {
 					keybindFields[i].setBindingText(value);
 				} else {
@@ -456,7 +480,7 @@ public class MineCadClient implements ClientModInitializer {
 			for (int i = 0; i < settingKeys.length; i++) {
 				try {
 					String value = keybindFields[i] != null ? keybindFields[i].getBindingText() : settingFields[i].getText();
-					MineFabSettings.setSettingValue(settingKeys[i], value);
+					MineCadSettings.setSettingValue(settingKeys[i], value);
 				} catch (RuntimeException e) {
 					System.out.println("[mine-cad] invalid value for " + settingKeys[i] + ": " + e.getMessage());
 				}
@@ -468,7 +492,7 @@ public class MineCadClient implements ClientModInitializer {
 		settingsY += settingsButtonHeight + 3;
 
 		resetSettingsButton = new InventoryTabWindowButton(settingsControlWidth, settingsButtonHeight, Component.literal("Reset Defaults"), () -> {
-			MineFabSettings.resetToDefaults();
+			MineCadSettings.resetToDefaults();
 			refreshSettingsFields.run();
 		});
 		resetSettingsButton.setFontSize(commandButtonFont * settingsScale);

@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.network.chat.Component;
 import name.minecad.client.input.BindingInput;
+import name.minecad.client.settings.MineCadSettings;
 import org.joml.Matrix3x2f;
 import org.lwjgl.glfw.GLFW;
 
@@ -98,10 +99,10 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
   @Override
   public boolean beginMouseDrag(int button) {
     int rotateButton = BindingInput.mouseButtonForBinding(
-        MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_rotation"),
+        MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_rotation"),
         GLFW.GLFW_MOUSE_BUTTON_MIDDLE);
     int panButton = BindingInput.mouseButtonForBinding(
-        MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_pan"),
+        MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_pan"),
         GLFW.GLFW_MOUSE_BUTTON_RIGHT);
 
     if (button == rotateButton) {
@@ -134,12 +135,12 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     if (dragMode == DragMode.ROTATE) {
       // Mouse acceleration: the faster the mouse moves, the more each pixel rotates.
       double speed = Math.hypot(deltaX, deltaY);
-      double sensitivity = ROTATE_SENSITIVITY * MineFabSettings.getMouseSensitivity();
+      double sensitivity = ROTATE_SENSITIVITY * MineCadSettings.getMouseSensitivity();
       double factor = 1.0;
-      if (MineFabSettings.isMouseAccelerationEnabled()) {
+      if (MineCadSettings.isMouseAccelerationEnabled()) {
         factor = Math.min(
             MAX_ACCELERATION,
-            1.0 + (ACCELERATION * MineFabSettings.getMouseAccelerationFactor() * speed));
+            1.0 + (ACCELERATION * MineCadSettings.getMouseAccelerationFactor() * speed));
       }
       yawDegrees += deltaX * sensitivity * factor;
       pitchDegrees -= deltaY * sensitivity * factor;
@@ -148,7 +149,7 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     }
 
     if (dragMode == DragMode.PAN) {
-      double panStep = PAN_SENSITIVITY * MineFabSettings.getCameraSpeed();
+      double panStep = PAN_SENSITIVITY * MineCadSettings.getCameraSpeed();
       offsetX -= deltaX * panStep;
       offsetY += deltaY * panStep;
       offsetX = Math.max(-20.0, Math.min(20.0, offsetX));
@@ -178,38 +179,38 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
     long now = System.nanoTime();
     double dt = Math.min(0.1, (now - lastMoveNanos) / 1.0e9);
     lastMoveNanos = now;
-    double step = MOVE_SPEED * MineFabSettings.getCameraSpeed() * dt;
-    if (MineFabSettings.isCameraAccelerationEnabled()) {
-      step *= MineFabSettings.getCameraAccelerationFactor();
+    double step = MOVE_SPEED * MineCadSettings.getCameraSpeed() * dt;
+    if (MineCadSettings.isCameraAccelerationEnabled()) {
+      step *= MineCadSettings.getCameraAccelerationFactor();
     }
 
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_speed_reset"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_speed_reset"), handle)) {
       step = MOVE_SPEED * dt;
     }
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_speed_increase"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_speed_increase"), handle)) {
       step *= 2.0;
     }
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_speed_decrease"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_speed_decrease"), handle)) {
       step *= 0.5;
     }
 
     // Objects move opposite to the camera in view space.
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_in"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_in"), handle)) {
       offsetZ -= step;
     }
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_out"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_out"), handle)) {
       offsetZ += step;
     }
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_left"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_left"), handle)) {
       offsetX += step;
     }
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_right"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_right"), handle)) {
       offsetX -= step;
     }
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_up"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_up"), handle)) {
       offsetY -= step;
     }
-    if (BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_down"), handle)) {
+    if (BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_down"), handle)) {
       offsetY += step;
     }
     offsetZ = Math.max(-CAMERA_DISTANCE + 2.0, Math.min(30.0, offsetZ));
@@ -224,11 +225,11 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
       return false;
     }
     long handle = Minecraft.getInstance().getWindow().handle();
-    if (!BindingInput.isScrollBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_zoom"), handle)) {
+    if (!BindingInput.isScrollBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_zoom"), handle)) {
       return false;
     }
 
-    double zoomInput = verticalAmount * MineFabSettings.getMouseSensitivity();
+    double zoomInput = verticalAmount * MineCadSettings.getMouseSensitivity();
     double scaled = renderScalePercent * Math.pow(ZOOM_STEP, zoomInput);
     renderScalePercent = Math.max(MIN_RENDER_SCALE_PERCENT, Math.min(MAX_RENDER_SCALE_PERCENT, scaled));
     return true;
@@ -238,14 +239,14 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
 
   @Override
   protected void drawSelf(GuiGraphicsExtractor graphics, Font font, int x, int y, int mouseX, int mouseY) {
-    setBackgroundColor(MineFabSettings.getViewportBackgroundColor());
+    setBackgroundColor(MineCadSettings.getViewportBackgroundColor());
     super.drawSelf(graphics, font, x, y, mouseX, mouseY);
     checkResetShortcut();
     if (dragging) {
       long handle = Minecraft.getInstance().getWindow().handle();
       int expectedButton = dragMode == DragMode.PAN
-          ? BindingInput.mouseButtonForBinding(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_pan"), GLFW.GLFW_MOUSE_BUTTON_RIGHT)
-          : BindingInput.mouseButtonForBinding(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_rotation"), GLFW.GLFW_MOUSE_BUTTON_MIDDLE);
+          ? BindingInput.mouseButtonForBinding(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_pan"), GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+          : BindingInput.mouseButtonForBinding(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_rotation"), GLFW.GLFW_MOUSE_BUTTON_MIDDLE);
 
       // Safety net: if release was missed, give the cursor back.
       if (GLFW.glfwGetMouseButton(handle, expectedButton) != GLFW.GLFW_PRESS) {
@@ -321,7 +322,7 @@ public class InventoryTabWindow3DRenderer extends InventoryTabWindow {
 
   private void checkResetShortcut() {
     long handle = Minecraft.getInstance().getWindow().handle();
-    boolean down = BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.3d_viewport_camera_reset"), handle);
+    boolean down = BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.3d_viewport_camera_reset"), handle);
     if (down && !resetBindingPreviouslyDown) {
       resetCameraPosition();
     }

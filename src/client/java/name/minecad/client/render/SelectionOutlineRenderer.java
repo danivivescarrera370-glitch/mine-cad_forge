@@ -7,12 +7,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import name.minecad.MineCad;
+import name.minecad.client.MineCadClient;
 import name.minecad.client.input.BindingInput;
-import name.minecad.scannedblock.ScannedBlock;
-import name.minecad.scannedblock.ScannedBlockManager;
-import name.minecad.ui.MineFabSettings;
-import name.minecad.wand.WandManager;
+import name.minecad.client.scannedblock.ScannedBlock;
+import name.minecad.client.scannedblock.ScannedBlockManager;
+import name.minecad.client.settings.MineCadSettings;
+import name.minecad.client.wand.WandManager;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
@@ -46,8 +46,8 @@ public final class SelectionOutlineRenderer {
 
     public static void register() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.level != null && MineCad.getScannedBlockManager() != null) {
-                MineCad.getScannedBlockManager().tick(client.level);
+            if (client.level != null && MineCadClient.getScannedBlockManager() != null) {
+                MineCadClient.getScannedBlockManager().tick(client.level);
             }
 
             handleOutlineToggleHotkey(client);
@@ -57,11 +57,11 @@ public final class SelectionOutlineRenderer {
     }
 
     private static void renderSelectionOutlines(LevelRenderContext context) {
-        if (!MineFabSettings.areOutlinesEnabled()) {
+        if (!MineCadSettings.areOutlinesEnabled()) {
             return;
         }
 
-        ScannedBlockManager manager = MineCad.getScannedBlockManager();
+        ScannedBlockManager manager = MineCadClient.getScannedBlockManager();
         if (manager == null) {
             return;
         }
@@ -79,8 +79,8 @@ public final class SelectionOutlineRenderer {
         }
 
         GizmoStyle hoveredStyle = GizmoStyle.stroke(
-                MineFabSettings.getHoveredOutlineColor(),
-                MineFabSettings.getOutlineStrokeWidth()
+                MineCadSettings.getHoveredOutlineColor(),
+                MineCadSettings.getOutlineStrokeWidth()
         );
 
         if (hoveredBlockPos != null) {
@@ -100,8 +100,8 @@ public final class SelectionOutlineRenderer {
     private static void ensureSelectionGizmosUpToDate(ScannedBlockManager manager) {
         // Outlines depend on block positions only, so state changes (doors, plates, ...) must not rebuild them.
         long revision = manager.getStructureRevision();
-        int outlineColor = MineFabSettings.getSelectedOutlineColor();
-        float strokeWidth = MineFabSettings.getOutlineStrokeWidth();
+        int outlineColor = MineCadSettings.getSelectedOutlineColor();
+        float strokeWidth = MineCadSettings.getOutlineStrokeWidth();
         if (revision == cachedRevision
                 && outlineColor == cachedOutlineColor
                 && Float.compare(strokeWidth, cachedStrokeWidth) == 0) {
@@ -287,7 +287,7 @@ public final class SelectionOutlineRenderer {
     }
 
     private static BlockPos getHoveredBlockPos() {
-        if (!MineFabSettings.isHoveredOutlineEnabled()) {
+        if (!MineCadSettings.isHoveredOutlineEnabled()) {
             return null;
         }
 
@@ -307,17 +307,17 @@ public final class SelectionOutlineRenderer {
 
     private static void handleOutlineToggleHotkey(Minecraft client) {
         long handle = client.getWindow().handle();
-        boolean down = BindingInput.isBindingActive(MineFabSettings.getSettingValue("keybinds.toggle_outline"), handle);
+        boolean down = BindingInput.isBindingActive(MineCadSettings.getSettingValue("keybinds.toggle_outline"), handle);
         if (down && !toggleBindingPreviouslyDown) {
-            boolean enabled = !MineFabSettings.areOutlinesEnabled();
-            MineFabSettings.setOutlinesEnabled(enabled);
+            boolean enabled = !MineCadSettings.areOutlinesEnabled();
+            MineCadSettings.setOutlinesEnabled(enabled);
             sendClientFeedback(client, "Selection outlines " + (enabled ? "enabled" : "disabled"));
         }
         toggleBindingPreviouslyDown = down;
     }
 
     private static boolean isHoldingWand(LocalPlayer player) {
-        WandManager wandManager = MineCad.getWandManager();
+        WandManager wandManager = MineCadClient.getWandManager();
         if (wandManager == null || wandManager.getWand() == null) {
             return false;
         }

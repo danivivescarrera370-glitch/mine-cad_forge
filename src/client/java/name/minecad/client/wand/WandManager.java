@@ -1,7 +1,7 @@
-package name.minecad.wand;
+package name.minecad.client.wand;
 
-import name.minecad.scannedblock.ScannedBlockManager;
-import name.minecad.ui.MineFabSettings;
+import name.minecad.client.scannedblock.ScannedBlockManager;
+import name.minecad.client.settings.MineCadSettings;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.core.BlockPos;
@@ -41,7 +41,7 @@ public class WandManager {
      */
     public void registerEvents() {
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (!MineFabSettings.isWandEnabled()) {
+            if (!MineCadSettings.isWandEnabled()) {
                 return InteractionResult.PASS;
             }
             if (player.isShiftKeyDown()) {
@@ -228,7 +228,7 @@ public class WandManager {
 
     public String getWandInfo() {
         Item currentWandItem = refreshConfiguredWandItem();
-        return "Wand enabled: " + MineFabSettings.isWandEnabled() + "\n"
+        return "Wand enabled: " + MineCadSettings.isWandEnabled() + "\n"
                 + "Current wand ID: " + currentWandItem.getDescriptionId();
     }
 
@@ -241,7 +241,7 @@ public class WandManager {
     }
 
     private boolean isHoldingConfiguredWand(Player player, InteractionHand hand) {
-        if (!MineFabSettings.isWandEnabled()) {
+        if (!MineCadSettings.isWandEnabled()) {
             return false;
         }
         Item activeWandItem = refreshConfiguredWandItem();
@@ -249,7 +249,7 @@ public class WandManager {
     }
 
     private Item resolveConfiguredWandItem() {
-        String configured = MineFabSettings.getWandDefaultItem();
+        String configured = MineCadSettings.getWandDefaultItem();
         String[] parts = configured.split(":", 2);
         if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
             return Items.STICK;

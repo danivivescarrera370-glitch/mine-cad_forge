@@ -1,4 +1,4 @@
-package name.minecad.player.commands;
+package name.minecad.client.commands;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -16,131 +16,139 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-import name.minecad.export.SelectionExporter;
-import name.minecad.scannedblock.ScannedBlock;
-import name.minecad.scannedblock.ScannedBlockManager;
-import name.minecad.stl.STLManager;
-import name.minecad.ui.MineFabSettings;
-import name.minecad.wand.WandManager;
+import name.minecad.client.export.SelectionExporter;
+import name.minecad.client.scannedblock.ScannedBlock;
+import name.minecad.client.scannedblock.ScannedBlockManager;
+import name.minecad.client.settings.MineCadSettings;
+import name.minecad.client.wand.WandManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.storage.LevelResource;
 
-public class MineFabCommands {
+public class MineCadCommands {
     private static ScannedBlockManager scannedBlockManager;
     private static WandManager wandManager;
-    private static STLManager stlMng;
     private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private static final Set<BlockPos> pendingVolumePoints = new LinkedHashSet<>();
 
-    public static void initialize(ScannedBlockManager blockManager, WandManager wManager, STLManager stlManager) {
+    public static void initialize(ScannedBlockManager blockManager, WandManager wManager) {
         scannedBlockManager = blockManager;
         wandManager = wManager;
-        stlMng = stlManager;
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("minecad")
                 .then(Commands.literal("selection")
-                        .then(Commands.literal("show").executes(MineFabCommands::showSelection))
-                        .then(Commands.literal("info").executes(MineFabCommands::showSelectionInfo))
+                        .then(Commands.literal("show").executes(MineCadCommands::showSelection))
+                        .then(Commands.literal("info").executes(MineCadCommands::showSelectionInfo))
                         .then(Commands.literal("save")
-                                .then(Commands.argument("filename", StringArgumentType.string())
-                                        .executes(MineFabCommands::saveSelection)))
+                                .then(Commands.argument("filename", StringArgumentType.greedyString())
+                                        .executes(MineCadCommands::saveSelection)))
                         .then(Commands.literal("import")
-                                .then(Commands.argument("filename", StringArgumentType.string())
-                                        .executes(MineFabCommands::importSelection)))
-                        .then(Commands.literal("list").executes(MineFabCommands::listSelections))
-                        .then(Commands.literal("delete").executes(MineFabCommands::deleteSelection))
+                                .then(Commands.argument("filename", StringArgumentType.greedyString())
+                                        .executes(MineCadCommands::importSelection)))
+                        .then(Commands.literal("list").executes(MineCadCommands::listSelections))
+                        .then(Commands.literal("delete").executes(MineCadCommands::deleteSelection))
                         .then(Commands.literal("add")
                                 .then(Commands.argument("x", IntegerArgumentType.integer())
                                         .then(Commands.argument("y", IntegerArgumentType.integer())
                                                 .then(Commands.argument("z", IntegerArgumentType.integer())
-                                                        .executes(MineFabCommands::addPendingVolumePoint)))))
+                                                        .executes(MineCadCommands::addPendingVolumePoint)))))
                         .then(Commands.literal("remove")
                                 .then(Commands.argument("x", IntegerArgumentType.integer())
                                         .then(Commands.argument("y", IntegerArgumentType.integer())
                                                 .then(Commands.argument("z", IntegerArgumentType.integer())
-                                                        .executes(MineFabCommands::removePendingVolumePoint)))))
+                                                        .executes(MineCadCommands::removePendingVolumePoint)))))
                         .then(Commands.literal("points")
                                 .then(Commands.literal("add")
                                         .then(Commands.argument("x", IntegerArgumentType.integer())
                                                 .then(Commands.argument("y", IntegerArgumentType.integer())
                                                         .then(Commands.argument("z", IntegerArgumentType.integer())
-                                                                .executes(MineFabCommands::addPendingVolumePoint)))))
+                                                                .executes(MineCadCommands::addPendingVolumePoint)))))
                                 .then(Commands.literal("remove")
                                         .then(Commands.argument("x", IntegerArgumentType.integer())
                                                 .then(Commands.argument("y", IntegerArgumentType.integer())
                                                         .then(Commands.argument("z", IntegerArgumentType.integer())
-                                                                .executes(MineFabCommands::removePendingVolumePoint)))))
-                                .then(Commands.literal("list").executes(MineFabCommands::listPendingVolumePoints))
-                                .then(Commands.literal("clear").executes(MineFabCommands::clearPendingVolumePoints))
-                                .then(Commands.literal("fill").executes(MineFabCommands::fillSelectionFromPendingPoints))
-                                .then(Commands.literal("info").executes(MineFabCommands::showPendingPointsInfo)))
-                        .then(Commands.literal("fillscanned").executes(MineFabCommands::fillSelectionFromScannedBounds))
-                        .then(Commands.literal("fillbounds").executes(MineFabCommands::fillSelectionFromScannedBounds))
+                                                                .executes(MineCadCommands::removePendingVolumePoint)))))
+                                .then(Commands.literal("list").executes(MineCadCommands::listPendingVolumePoints))
+                                .then(Commands.literal("clear").executes(MineCadCommands::clearPendingVolumePoints))
+                                .then(Commands.literal("fill").executes(MineCadCommands::fillSelectionFromPendingPoints))
+                                .then(Commands.literal("info").executes(MineCadCommands::showPendingPointsInfo)))
+                        .then(Commands.literal("fillscanned").executes(MineCadCommands::fillSelectionFromScannedBounds))
+                        .then(Commands.literal("fillbounds").executes(MineCadCommands::fillSelectionFromScannedBounds))
                         .then(Commands.literal("export")
-                                .then(Commands.argument("filename", StringArgumentType.string())
-                                        .executes(MineFabCommands::exportSelectionDefault))
-                                .then(Commands.argument("format", StringArgumentType.word())
-                                        .then(Commands.argument("filename", StringArgumentType.string())
-                                                .executes(MineFabCommands::exportSelectionWithFormat))))
+                                .then(Commands.literal("stl")
+                                        .then(Commands.argument("filename", StringArgumentType.greedyString())
+                                                .executes(ctx -> exportSelection(ctx, SelectionExporter.Format.STL,
+                                                        StringArgumentType.getString(ctx, "filename")))))
+                                .then(Commands.literal("obj")
+                                        .then(Commands.argument("filename", StringArgumentType.greedyString())
+                                                .executes(ctx -> exportSelection(ctx, SelectionExporter.Format.OBJ,
+                                                        StringArgumentType.getString(ctx, "filename")))))
+                                .then(Commands.literal("fbx")
+                                        .then(Commands.argument("filename", StringArgumentType.greedyString())
+                                                .executes(ctx -> exportSelection(ctx, SelectionExporter.Format.FBX,
+                                                        StringArgumentType.getString(ctx, "filename")))))
+                                .then(Commands.argument("filename", StringArgumentType.greedyString())
+                                        .executes(MineCadCommands::exportSelectionDefault)))
                         .then(Commands.literal("geometry")
-                                .executes(MineFabCommands::showGeometryAll)
+                                .executes(MineCadCommands::showGeometryAll)
                                 .then(Commands.argument("index", IntegerArgumentType.integer(0))
-                                        .executes(MineFabCommands::showGeometryByIndex)))
+                                        .executes(MineCadCommands::showGeometryByIndex)))
                         .then(Commands.literal("scale")
-                                .executes(MineFabCommands::showScale)
+                                .executes(MineCadCommands::showScale)
                                 .then(Commands.argument("metersPerBlock",
-                                                DoubleArgumentType.doubleArg(MineFabSettings.getMinMetersPerBlock(), MineFabSettings.getMaxMetersPerBlock()))
-                                        .executes(MineFabCommands::setScale))))
+                                                DoubleArgumentType.doubleArg(MineCadSettings.getMinMetersPerBlock(), MineCadSettings.getMaxMetersPerBlock()))
+                                        .executes(MineCadCommands::setScale))))
                 .then(Commands.literal("wand")
-                        .then(Commands.literal("info").executes(MineFabCommands::wandInfo))
-                        .then(Commands.literal("clear").executes(MineFabCommands::wandClear)))
-                .then(Commands.literal("help").executes(MineFabCommands::showHelp))
-                .then(Commands.literal("info").executes(MineFabCommands::showInfo))
+                        .then(Commands.literal("info").executes(MineCadCommands::wandInfo))
+                        .then(Commands.literal("clear").executes(MineCadCommands::wandClear)))
+                .then(Commands.literal("help").executes(MineCadCommands::showHelp))
+                .then(Commands.literal("info").executes(MineCadCommands::showInfo))
                 .then(Commands.literal("settings")
-                        .executes(MineFabCommands::showSettings)
-                        .then(Commands.literal("show").executes(MineFabCommands::showSettings))
-                        .then(Commands.literal("list").executes(MineFabCommands::listSettingsKeys))
+                        .executes(MineCadCommands::showSettings)
+                        .then(Commands.literal("show").executes(MineCadCommands::showSettings))
+                        .then(Commands.literal("list").executes(MineCadCommands::listSettingsKeys))
                         .then(Commands.literal("get")
                                 .then(Commands.argument("key", StringArgumentType.word())
-                                        .executes(MineFabCommands::getSettingsValueByKey)))
+                                        .executes(MineCadCommands::getSettingsValueByKey)))
                         .then(Commands.literal("set")
                                 .then(Commands.argument("key", StringArgumentType.word())
                                         .then(Commands.argument("value", StringArgumentType.greedyString())
-                                                .executes(MineFabCommands::setSettingsValueByKey))))
-                        .then(Commands.literal("reset").executes(MineFabCommands::resetSettings))
+                                                .executes(MineCadCommands::setSettingsValueByKey))))
+                        .then(Commands.literal("reset").executes(MineCadCommands::resetSettings))
                         .then(Commands.literal("scale")
-                                .executes(MineFabCommands::showSettingsScale)
+                                .executes(MineCadCommands::showSettingsScale)
                                 .then(Commands.argument("metersPerBlock",
-                                                DoubleArgumentType.doubleArg(MineFabSettings.getMinMetersPerBlock(), MineFabSettings.getMaxMetersPerBlock()))
-                                        .executes(MineFabCommands::setSettingsScale)))
+                                                DoubleArgumentType.doubleArg(MineCadSettings.getMinMetersPerBlock(), MineCadSettings.getMaxMetersPerBlock()))
+                                        .executes(MineCadCommands::setSettingsScale)))
                         .then(Commands.literal("outlines")
                                 .then(Commands.argument("enabled", StringArgumentType.word())
-                                        .executes(MineFabCommands::setOutlinesEnabledFromSettings)))
+                                        .executes(MineCadCommands::setOutlinesEnabledFromSettings)))
                         .then(Commands.literal("maxrenderblocks")
-                                .executes(MineFabCommands::showMaxRenderBlocks)
+                                .executes(MineCadCommands::showMaxRenderBlocks)
                                 .then(Commands.argument("blocks",
-                                                IntegerArgumentType.integer(MineFabSettings.getMinMaxRenderBlocks(), MineFabSettings.getMaxMaxRenderBlocks()))
-                                        .executes(MineFabCommands::setMaxRenderBlocks)))
+                                                IntegerArgumentType.integer(MineCadSettings.getMinMaxRenderBlocks(), MineCadSettings.getMaxMaxRenderBlocks()))
+                                        .executes(MineCadCommands::setMaxRenderBlocks)))
                         .then(Commands.literal("interactiverenderblocks")
-                                .executes(MineFabCommands::showInteractiveRenderBlocks)
+                                .executes(MineCadCommands::showInteractiveRenderBlocks)
                                 .then(Commands.argument("blocks",
-                                                IntegerArgumentType.integer(MineFabSettings.getMinMaxRenderBlocks(), MineFabSettings.getMaxMaxRenderBlocks()))
-                                        .executes(MineFabCommands::setInteractiveRenderBlocks)))
+                                                IntegerArgumentType.integer(MineCadSettings.getMinMaxRenderBlocks(), MineCadSettings.getMaxMaxRenderBlocks()))
+                                        .executes(MineCadCommands::setInteractiveRenderBlocks)))
                         .then(Commands.literal("outlinecolor")
                                 .then(Commands.argument("color", StringArgumentType.word())
-                                        .executes(MineFabCommands::setOutlineColorFromSettings)))
+                                        .executes(MineCadCommands::setOutlineColorFromSettings)))
                         .then(Commands.literal("outlinethickness")
                                 .then(Commands.argument("width",
-                                                DoubleArgumentType.doubleArg(MineFabSettings.getMinStrokeWidth(), MineFabSettings.getMaxStrokeWidth()))
-                                        .executes(MineFabCommands::setOutlineStrokeWidthFromSettings)))));
+                                                DoubleArgumentType.doubleArg(MineCadSettings.getMinStrokeWidth(), MineCadSettings.getMaxStrokeWidth()))
+                                        .executes(MineCadCommands::setOutlineStrokeWidthFromSettings)))));
     }
 
     private static int showSelection(CommandContext<CommandSourceStack> context) {
@@ -276,10 +284,11 @@ public class MineFabCommands {
         }
 
         // Commands run on the common/server side; reload persisted settings so export uses the latest saved scale.
-        MineFabSettings.load();
-        double metersPerBlock = MineFabSettings.getMetersPerBlock();
+        MineCadSettings.load();
+        double metersPerBlock = MineCadSettings.getMetersPerBlock();
 
-        Path exportDir = getMineFabDataDir(context).resolve("exports");
+        Path exportRootDir = getConfiguredExportDir(context);
+        Path exportDir = exportRootDir.resolve(format.extension());
         Path filePath = exportDir.resolve(stripKnownExtension(normalized) + "." + format.extension());
         SelectionExporter.ExportResult result = SelectionExporter.export(
                 context.getSource().getLevel(),
@@ -295,32 +304,49 @@ public class MineFabCommands {
         }
 
         String relativeOutput = getMineFabDataDir(context).getParent().relativize(filePath).toString();
+        String absoluteOutput = filePath.toAbsolutePath().normalize().toString();
         context.getSource().sendSuccess(() -> Component.literal(
                 result.message() + " [" + format.name().toLowerCase(Locale.ROOT) + "] at " + relativeOutput
-                        + " (scale: 1 block = " + MineFabSettings.formatNumber(metersPerBlock) + " m)"
+                        + " (scale: 1 block = " + MineCadSettings.formatNumber(metersPerBlock) + " m)"
                         + (format == SelectionExporter.Format.STL ? " [STL units: mm]" : " [units: m]")
         ), false);
+        showLocalExportPathMessage(absoluteOutput, exportDir.toAbsolutePath().normalize());
+        System.out.println("[mine-cad] export complete (" + format.name().toLowerCase(Locale.ROOT) + "): " + absoluteOutput);
         return 1;
     }
 
+    private static void showLocalExportPathMessage(String filePath, Path folderPath) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.gui == null || minecraft.gui.hud == null || minecraft.player == null) {
+            return;
+        }
+
+        Component clickablePath = Component.literal(filePath).withStyle(style -> style
+                .withUnderlined(true)
+                .withClickEvent(new ClickEvent.OpenFile(folderPath)));
+        Component message = Component.literal("Exported to: ").append(clickablePath);
+        // Commands run on the integrated server thread; chat GUI must be touched on the render thread.
+        minecraft.execute(() -> minecraft.gui.hud.getChat().addClientSystemMessage(message));
+    }
+
     private static int showScale(CommandContext<CommandSourceStack> context) {
-        double scale = MineFabSettings.getMetersPerBlock();
+        double scale = MineCadSettings.getMetersPerBlock();
         context.getSource().sendSuccess(() -> Component.literal(
-                "Scale: 1 block = " + MineFabSettings.formatNumber(scale) + " meter" + (scale == 1.0D ? "" : "s")), false);
+                "Scale: 1 block = " + MineCadSettings.formatNumber(scale) + " meter" + (scale == 1.0D ? "" : "s")), false);
         return 1;
     }
 
     private static int setScale(CommandContext<CommandSourceStack> context) {
         double metersPerBlock = DoubleArgumentType.getDouble(context, "metersPerBlock");
-        MineFabSettings.setMetersPerBlock(metersPerBlock);
-        double applied = MineFabSettings.getMetersPerBlock();
+        MineCadSettings.setMetersPerBlock(metersPerBlock);
+        double applied = MineCadSettings.getMetersPerBlock();
         context.getSource().sendSuccess(() -> Component.literal(
-                "Scale set: 1 block = " + MineFabSettings.formatNumber(applied) + " meter" + (applied == 1.0D ? "" : "s")), false);
+                "Scale set: 1 block = " + MineCadSettings.formatNumber(applied) + " meter" + (applied == 1.0D ? "" : "s")), false);
         return 1;
     }
 
     private static int showMaxRenderBlocks(CommandContext<CommandSourceStack> context) {
-        int max = MineFabSettings.getMaxRenderBlocks();
+        int max = MineCadSettings.getMaxRenderBlocks();
         context.getSource().sendSuccess(() -> Component.literal(
                 "3D viewport max render blocks: " + max), false);
         return 1;
@@ -328,15 +354,15 @@ public class MineFabCommands {
 
     private static int setMaxRenderBlocks(CommandContext<CommandSourceStack> context) {
         int requested = IntegerArgumentType.getInteger(context, "blocks");
-        MineFabSettings.setMaxRenderBlocks(requested);
-        int applied = MineFabSettings.getMaxRenderBlocks();
+        MineCadSettings.setMaxRenderBlocks(requested);
+        int applied = MineCadSettings.getMaxRenderBlocks();
         context.getSource().sendSuccess(() -> Component.literal(
                 "3D viewport max render blocks set to " + applied), false);
         return 1;
     }
 
     private static int showInteractiveRenderBlocks(CommandContext<CommandSourceStack> context) {
-        int max = MineFabSettings.getInteractiveRenderBlocks();
+        int max = MineCadSettings.getInteractiveRenderBlocks();
         context.getSource().sendSuccess(() -> Component.literal(
                 "3D viewport interactive render blocks: " + max), false);
         return 1;
@@ -344,8 +370,8 @@ public class MineFabCommands {
 
     private static int setInteractiveRenderBlocks(CommandContext<CommandSourceStack> context) {
         int requested = IntegerArgumentType.getInteger(context, "blocks");
-        MineFabSettings.setInteractiveRenderBlocks(requested);
-        int applied = MineFabSettings.getInteractiveRenderBlocks();
+        MineCadSettings.setInteractiveRenderBlocks(requested);
+        int applied = MineCadSettings.getInteractiveRenderBlocks();
         context.getSource().sendSuccess(() -> Component.literal(
                 "3D viewport interactive render blocks set to " + applied), false);
         return 1;
@@ -400,6 +426,7 @@ public class MineFabCommands {
                         "/minecad settings interactiverenderblocks [blocks] - Show or set how many blocks are drawn while the 3D view is moving\n" +
                         "/minecad settings outlinecolor <hex> - Set outline color\n" +
                         "/minecad settings outlinethickness <width> - Set outline thickness\n" +
+                        "/minecad settings set exports.output_directory <path> - Set export folder (absolute or world-relative)\n" +
                         "/minecad wand info - Show wand information\n" +
                         "/minecad wand clear - Clear wand selection\n" +
                         "/minecad help - Show this help message\n" +
@@ -414,13 +441,13 @@ public class MineFabCommands {
     }
 
     private static int showSettings(CommandContext<CommandSourceStack> context) {
-        MineFabSettings.load();
+        MineCadSettings.load();
         context.getSource().sendSuccess(() -> Component.literal(getSettingsSummary()), false);
         return 1;
     }
 
     private static int resetSettings(CommandContext<CommandSourceStack> context) {
-        MineFabSettings.resetToDefaults();
+        MineCadSettings.resetToDefaults();
         context.getSource().sendSuccess(() -> Component.literal("MineFab settings reset to defaults.\n" + getSettingsSummary()), false);
         return 1;
     }
@@ -456,6 +483,7 @@ public class MineFabCommands {
                         + "- keybinds.3d_viewport_camera_down\n"
                         + "- measurements.unit\n"
                         + "- measurements.block_to_unit_scale\n"
+                        + "- exports.output_directory\n"
                         + "- wand.enabled\n"
                         + "- wand.default_wand_item"
         ), false);
@@ -465,7 +493,7 @@ public class MineFabCommands {
     private static int getSettingsValueByKey(CommandContext<CommandSourceStack> context) {
         String key = StringArgumentType.getString(context, "key");
         try {
-            String value = MineFabSettings.getSettingValue(key);
+            String value = MineCadSettings.getSettingValue(key);
             context.getSource().sendSuccess(() -> Component.literal(key + " = " + value), false);
             return 1;
         } catch (IllegalArgumentException e) {
@@ -478,8 +506,8 @@ public class MineFabCommands {
         String key = StringArgumentType.getString(context, "key");
         String value = StringArgumentType.getString(context, "value");
         try {
-            MineFabSettings.setSettingValue(key, value);
-            String applied = MineFabSettings.getSettingValue(key);
+            MineCadSettings.setSettingValue(key, value);
+            String applied = MineCadSettings.getSettingValue(key);
             context.getSource().sendSuccess(() -> Component.literal("Set " + key + " = " + applied), false);
             return 1;
         } catch (IllegalArgumentException e) {
@@ -499,8 +527,8 @@ public class MineFabCommands {
     private static int setOutlinesEnabledFromSettings(CommandContext<CommandSourceStack> context) {
         String raw = StringArgumentType.getString(context, "enabled");
         try {
-            MineFabSettings.setSettingValue("outline_settings.enabled", raw);
-            boolean enabled = Boolean.parseBoolean(MineFabSettings.getSettingValue("outline_settings.enabled"));
+            MineCadSettings.setSettingValue("outline_settings.enabled", raw);
+            boolean enabled = Boolean.parseBoolean(MineCadSettings.getSettingValue("outline_settings.enabled"));
             context.getSource().sendSuccess(() -> Component.literal("Outline setting 'enabled' = " + enabled), false);
             return 1;
         } catch (IllegalArgumentException e) {
@@ -512,8 +540,8 @@ public class MineFabCommands {
     private static int setOutlineColorFromSettings(CommandContext<CommandSourceStack> context) {
         String raw = StringArgumentType.getString(context, "color");
         try {
-            MineFabSettings.setSettingValue("outline_settings.color", raw);
-            String value = MineFabSettings.getSettingValue("outline_settings.color");
+            MineCadSettings.setSettingValue("outline_settings.color", raw);
+            String value = MineCadSettings.getSettingValue("outline_settings.color");
             context.getSource().sendSuccess(() -> Component.literal("Outline setting 'color' = " + value), false);
             return 1;
         } catch (IllegalArgumentException e) {
@@ -524,8 +552,8 @@ public class MineFabCommands {
 
     private static int setOutlineStrokeWidthFromSettings(CommandContext<CommandSourceStack> context) {
         double width = DoubleArgumentType.getDouble(context, "width");
-        MineFabSettings.setSettingValue("outline_settings.thickness", MineFabSettings.formatNumber(width));
-        String value = MineFabSettings.getSettingValue("outline_settings.thickness");
+        MineCadSettings.setSettingValue("outline_settings.thickness", MineCadSettings.formatNumber(width));
+        String value = MineCadSettings.getSettingValue("outline_settings.thickness");
         context.getSource().sendSuccess(() -> Component.literal("Outline setting 'thickness' = " + value), false);
         return 1;
     }
@@ -649,22 +677,23 @@ public class MineFabCommands {
 
     private static String getSettingsSummary() {
         return "MineFab settings:\n"
-                + "- Outlines enabled: " + MineFabSettings.areOutlinesEnabled() + "\n"
-                + "- Outline color: " + MineFabSettings.getSettingValue("outline_settings.color") + "\n"
-                + "- Outline thickness: " + MineFabSettings.getSettingValue("outline_settings.thickness") + "\n"
-                + "- Scale: 1 block = " + MineFabSettings.formatNumber(MineFabSettings.getMetersPerBlock()) + " m\n"
-                + "- Measurement unit: " + MineFabSettings.getMeasurementUnit() + "\n"
-                + "- Viewport background: " + MineFabSettings.formatColor(MineFabSettings.getViewportBackgroundColor()) + "\n"
-                + "- Mouse sensitivity: " + MineFabSettings.formatNumber(MineFabSettings.getMouseSensitivity()) + "\n"
-                + "- Mouse acceleration: " + MineFabSettings.isMouseAccelerationEnabled() + " (factor "
-                + MineFabSettings.formatNumber(MineFabSettings.getMouseAccelerationFactor()) + ")\n"
-                + "- Camera speed: " + MineFabSettings.formatNumber(MineFabSettings.getCameraSpeed()) + "\n"
-                + "- Camera acceleration: " + MineFabSettings.isCameraAccelerationEnabled() + " (factor "
-                + MineFabSettings.formatNumber(MineFabSettings.getCameraAccelerationFactor()) + ")\n"
-                + "- Max render blocks: " + MineFabSettings.getMaxRenderBlocks() + "\n"
-                + "- Interactive render blocks: " + MineFabSettings.getInteractiveRenderBlocks() + "\n"
-                + "- Wand enabled: " + MineFabSettings.isWandEnabled() + "\n"
-                + "- Wand default item: " + MineFabSettings.getWandDefaultItem();
+                + "- Outlines enabled: " + MineCadSettings.areOutlinesEnabled() + "\n"
+                + "- Outline color: " + MineCadSettings.getSettingValue("outline_settings.color") + "\n"
+                + "- Outline thickness: " + MineCadSettings.getSettingValue("outline_settings.thickness") + "\n"
+                + "- Scale: 1 block = " + MineCadSettings.formatNumber(MineCadSettings.getMetersPerBlock()) + " m\n"
+                + "- Export folder: " + MineCadSettings.getSettingValue("exports.output_directory") + "\n"
+                + "- Measurement unit: " + MineCadSettings.getMeasurementUnit() + "\n"
+                + "- Viewport background: " + MineCadSettings.formatColor(MineCadSettings.getViewportBackgroundColor()) + "\n"
+                + "- Mouse sensitivity: " + MineCadSettings.formatNumber(MineCadSettings.getMouseSensitivity()) + "\n"
+                + "- Mouse acceleration: " + MineCadSettings.isMouseAccelerationEnabled() + " (factor "
+                + MineCadSettings.formatNumber(MineCadSettings.getMouseAccelerationFactor()) + ")\n"
+                + "- Camera speed: " + MineCadSettings.formatNumber(MineCadSettings.getCameraSpeed()) + "\n"
+                + "- Camera acceleration: " + MineCadSettings.isCameraAccelerationEnabled() + " (factor "
+                + MineCadSettings.formatNumber(MineCadSettings.getCameraAccelerationFactor()) + ")\n"
+                + "- Max render blocks: " + MineCadSettings.getMaxRenderBlocks() + "\n"
+                + "- Interactive render blocks: " + MineCadSettings.getInteractiveRenderBlocks() + "\n"
+                + "- Wand enabled: " + MineCadSettings.isWandEnabled() + "\n"
+                + "- Wand default item: " + MineCadSettings.getWandDefaultItem();
     }
 
     private static String clearWandSelection() {
@@ -740,6 +769,26 @@ public class MineFabCommands {
 
     private static Path getMineFabDataDir(CommandContext<CommandSourceStack> context) {
         return context.getSource().getServer().getWorldPath(LevelResource.ROOT).resolve("minefab_data");
+    }
+
+    private static Path getConfiguredExportDir(CommandContext<CommandSourceStack> context) {
+        String configured = MineCadSettings.getSettingValue("exports.output_directory");
+        String trimmed = configured == null ? "" : configured.trim();
+        if (trimmed.isEmpty()) {
+            return getMineFabDataDir(context).resolve("exports");
+        }
+
+        try {
+            Path configuredPath = Path.of(trimmed);
+            if (configuredPath.isAbsolute()) {
+                return configuredPath.normalize();
+            }
+            return context.getSource().getServer().getWorldPath(LevelResource.ROOT).resolve(configuredPath).normalize();
+        } catch (RuntimeException invalidPath) {
+            System.out.println("[mine-cad] invalid exports.output_directory setting '" + configured
+                    + "', falling back to minefab_data/exports");
+            return getMineFabDataDir(context).resolve("exports");
+        }
     }
 
     private static class SelectionData {
@@ -851,7 +900,8 @@ public class MineFabCommands {
             return "";
         }
         String normalized = trimmed.replace('\\', '_').replace('/', '_');
-        normalized = normalized.replaceAll("[^A-Za-z0-9._-]", "_");
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+        normalized = normalized.replaceAll("[^A-Za-z0-9 ._-]", "_");
         return normalized;
     }
 
@@ -889,10 +939,10 @@ public class MineFabCommands {
             int sizeY = maxY - minY + 1;
             int sizeZ = maxZ - minZ + 1;
             return sizeX + "x" + sizeY + "x" + sizeZ + " blocks = "
-                    + MineFabSettings.formatNumber(MineFabSettings.blocksToMeters(sizeX)) + " x "
-                    + MineFabSettings.formatNumber(MineFabSettings.blocksToMeters(sizeY)) + " x "
-                    + MineFabSettings.formatNumber(MineFabSettings.blocksToMeters(sizeZ)) + " m (1 block = "
-                    + MineFabSettings.formatNumber(MineFabSettings.getMetersPerBlock()) + " m)";
+                    + MineCadSettings.formatNumber(MineCadSettings.blocksToMeters(sizeX)) + " x "
+                    + MineCadSettings.formatNumber(MineCadSettings.blocksToMeters(sizeY)) + " x "
+                    + MineCadSettings.formatNumber(MineCadSettings.blocksToMeters(sizeZ)) + " m (1 block = "
+                    + MineCadSettings.formatNumber(MineCadSettings.getMetersPerBlock()) + " m)";
         }
     }
 

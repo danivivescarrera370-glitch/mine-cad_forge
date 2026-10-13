@@ -41,13 +41,4 @@ public class STL {
 
     }
 
-//    public void createSTLFile(Path filePath) {
-//        if (filePath == null || !Files.exists(filePath)) {
-//            throw new IllegalArgumentException("Invalid file path provided for STL file.");
-//        }
-//        this.stlFilePath = filePath;
-//        System.out.println("STL file created at: " + filePath.toString());
-//    }
-
-    // Additional methods can be added here as needed.
 }

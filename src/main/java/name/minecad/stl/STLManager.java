@@ -68,18 +68,6 @@ public class STLManager {
         return this.stl;
     }
 
-    public void exportToSTL(STL stl, LinkedList<Block> blocks) {
-
-
-
-    }
-
-    public void exportToSTL(STL stl, Path jsonFile){
-
-
-
-    }
-
     /**
      * Returns the current multiplier used by this STLManager.
      * @return The current multiplier.

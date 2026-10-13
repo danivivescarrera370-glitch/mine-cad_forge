@@ -30,8 +30,54 @@ public class MineCadClient implements ClientModInitializer {
 	private static int pendingTabsOffsetY = 0;
 	private static final int TEXT_PANEL_SCROLLBAR_SIZE = 8;
 
-	// privates for all the stuff we will need in the GUI.
+	// instantiating these early so i dont run into any circular dependency issues
+	private InventoryTabWindow mainWindow;
+	private ScrollableControlPane additionalSettingsPane;
+	private InventoryTabWindowButton fileLabelBox;
+	private InventoryTabWindowTextField fileNameField;
+	private InventoryTabWindowButton saveButton;
+	private InventoryTabWindowButton importButton;
+	private InventoryTabWindowButton exportStlButton;
+	private InventoryTabWindowButton exportObjButton;
+	private InventoryTabWindowButton exportFbxButton;
+	private InventoryTabWindowButton fillScannedButton;
+	private InventoryTabWindowButton fillBoundsButton;
+	private InventoryTabWindowButton scaleLabelBox;
+	private InventoryTabWindowTextField scaleField;
+	private InventoryTabWindowButton setScaleButton;
+	private InventoryTabWindowButton showScaleButton;
+	private InventoryTabWindowButton resetCameraButton;
+	private InventoryTabWindowButton deleteButton;
+	private InventoryTabWindowButton listButton;
+	private InventoryTabWindowButton xLabelBox;
+	private InventoryTabWindowTextField xField;
+	private InventoryTabWindowButton yLabelBox;
+	private InventoryTabWindowTextField yField;
+	private InventoryTabWindowButton zLabelBox;
+	private InventoryTabWindowTextField zField;
+	private InventoryTabWindowButton addButton;
+	private InventoryTabWindowButton removeButton;
+	private InventoryTabWindowButton pointsAddButton;
+	private InventoryTabWindowButton pointsRemoveButton;
+	private InventoryTabWindowButton pointsListButton;
+	private InventoryTabWindowButton pointsClearButton;
+	private InventoryTabWindowButton pointsFillButton;
+	private InventoryTabWindowButton pointsInfoButton;
+	private InventoryTabWindowButton showButton;
+	private InventoryTabWindowButton infoButton;
 	private InventoryTabWindow3DRenderer view3dPane;
+	private ScrollableControlPane settingsPane;
+	private InventoryTabWindowTextField[] settingFields;
+	private InventoryTabWindowKeybindField[] keybindFields;
+	private InventoryTabWindowButton applySettingsButton;
+	private InventoryTabWindowButton resetSettingsButton;
+	private InventoryTabTextPanel savesPane;
+	private InventoryTabTextPanel helpPane;
+	private InventoryTabTextPanel infoPane;
+	private InventoryTabWindow[] panes;
+	private InventorySideTabButton[] leftSideTabs;
+	private InventoryTab mineCadTab;
+
 
 	public static void setAdditionalTabsOffset(int xOffset, int yOffset) {
 		pendingTabsOffsetX = xOffset;
@@ -62,11 +108,11 @@ public class MineCadClient implements ClientModInitializer {
 		// The 3D preview is drawn by the GPU through the game's picture-in-picture pipeline.
 		PictureInPictureRendererRegistry.register(context -> new ScenePipRenderer());
 
-		InventoryTabWindow mainWindow = new InventoryTabWindow(176, 166);
+		mainWindow = new InventoryTabWindow(176, 166);
 		mainWindow.setPadding(3);
 
 		/** Additional Settings Tab For Selection & 3d View - added AFTER content panes so it renders on top */
-		ScrollableControlPane additionalSettingsPane = new ScrollableControlPane(90, 136, Component.literal("Selection Settings"));
+		additionalSettingsPane = new ScrollableControlPane(90, 136, Component.literal("Selection Settings"));
 		additionalSettingsPane.setTitleStyle(0xFF2E2E2E, 0.80F);
 		mainWindow.addChild(additionalSettingsPane);
 		// Nested in mainWindow, anchored to its right side and resting flush against the outside edge.
@@ -93,12 +139,12 @@ public class MineCadClient implements ClientModInitializer {
 		final int scaleLabelWidth = 18;
 		final int scaleFieldWidth = Math.max(24, commandButtonWidth - scaleLabelWidth - inlineFieldGap);
 
-		InventoryTabWindowButton fileLabelBox = new InventoryTabWindowButton(fileLabelWidth, 14, Component.literal("File\nName"), null);
+		fileLabelBox = new InventoryTabWindowButton(fileLabelWidth, 14, Component.literal("File\nName"), null);
 		fileLabelBox.setEnabled(false);
 		fileLabelBox.setFontSize(0.46F);
 		additionalSettingsPane.addScrollableChild(fileLabelBox, 0, commandY);
 
-		InventoryTabWindowTextField fileNameField = new InventoryTabWindowTextField(
+		fileNameField = new InventoryTabWindowTextField(
 				fileFieldWidth,
 				14,
 				Component.empty(),
@@ -109,55 +155,55 @@ public class MineCadClient implements ClientModInitializer {
 		additionalSettingsPane.addScrollableChild(fileNameField, fileLabelWidth + inlineFieldGap, commandY);
 		commandY += 14 + rowGap;
 
-		InventoryTabWindowButton saveButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Save"),
+		saveButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Save"),
 				() -> runSelectionCommand("selection save " + readOrDefault(fileNameField, "selection_01")));
 		saveButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(saveButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton importButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Import"),
+		importButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Import"),
 				() -> runSelectionCommand("selection import " + readOrDefault(fileNameField, "selection_01")));
 		importButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(importButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton exportStlButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Export STL"),
+		exportStlButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Export STL"),
 				() -> runSelectionCommand("selection export stl " + readOrDefault(fileNameField, "selection_export")));
 		exportStlButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(exportStlButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton exportObjButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Export OBJ"),
+		exportObjButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Export OBJ"),
 				() -> runSelectionCommand("selection export obj " + readOrDefault(fileNameField, "selection_export")));
 		exportObjButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(exportObjButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton exportFbxButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Export FBX"),
+		exportFbxButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Export FBX"),
 				() -> runSelectionCommand("selection export fbx " + readOrDefault(fileNameField, "selection_export")));
 		exportFbxButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(exportFbxButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton fillScannedButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Fill Scan"),
+		fillScannedButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Fill Scan"),
 				() -> runSelectionCommand("selection fillscanned"));
 		fillScannedButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(fillScannedButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton fillBoundsButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Fill Bounds"),
+		fillBoundsButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Fill Bounds"),
 				() -> runSelectionCommand("selection fillbounds"));
 		fillBoundsButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(fillBoundsButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
 		// Scale: how many meters one block represents (1 = default, 0.1 = block is 10 cm, 2 = block is 2 m, ...)
-		InventoryTabWindowButton scaleLabelBox = new InventoryTabWindowButton(scaleLabelWidth, 14, Component.literal("Block\nScale"), null);
+		scaleLabelBox = new InventoryTabWindowButton(scaleLabelWidth, 14, Component.literal("Block\nScale"), null);
 		scaleLabelBox.setEnabled(false);
 		scaleLabelBox.setFontSize(0.44F);
 		additionalSettingsPane.addScrollableChild(scaleLabelBox, 0, commandY);
 
-		InventoryTabWindowTextField scaleField = new InventoryTabWindowTextField(
+		scaleField = new InventoryTabWindowTextField(
 				scaleFieldWidth,
 				14,
 				Component.empty(),
@@ -168,7 +214,7 @@ public class MineCadClient implements ClientModInitializer {
 		additionalSettingsPane.addScrollableChild(scaleField, scaleLabelWidth + inlineFieldGap, commandY);
 		commandY += 14 + rowGap;
 
-		InventoryTabWindowButton setScaleButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Set Scale"), () -> {
+		setScaleButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Set Scale"), () -> {
 			String value = readOrDefault(scaleField, "1");
 			try {
 				MineFabSettings.setMetersPerBlock(Double.parseDouble(value));
@@ -183,14 +229,14 @@ public class MineCadClient implements ClientModInitializer {
 		additionalSettingsPane.addScrollableChild(setScaleButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton showScaleButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Show Scale"),
+		showScaleButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Show Scale"),
 				() -> runSelectionCommand("selection scale"));
 		showScaleButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(showScaleButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
 		// The rest of the controls stay below the primary file/export/fill/scale actions.
-		InventoryTabWindowButton resetCameraButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Reset Camera"), () -> {
+		resetCameraButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Reset Camera"), () -> {
 			if (view3dPane == null) {
 				return;
 			}
@@ -200,103 +246,103 @@ public class MineCadClient implements ClientModInitializer {
 		additionalSettingsPane.addScrollableChild(resetCameraButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton deleteButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Delete Selection"),
+		deleteButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Delete Selection"),
 				() -> runSelectionCommand("selection delete"));
 		deleteButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(deleteButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton listButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("List"),
+		listButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("List"),
 				() -> runSelectionCommand("selection list"));
 		listButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(listButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton xLabelBox = new InventoryTabWindowButton(inlineLabelWidth, 14, Component.literal("X:"), null);
+		xLabelBox = new InventoryTabWindowButton(inlineLabelWidth, 14, Component.literal("X:"), null);
 		xLabelBox.setEnabled(false);
 		xLabelBox.setFontSize(0.60F);
 		additionalSettingsPane.addScrollableChild(xLabelBox, 0, commandY);
-		InventoryTabWindowTextField xField = new InventoryTabWindowTextField(inlineFieldWidth, 14, Component.empty(), InventoryTabWindowTextField.InputMode.NUMERIC);
+		xField = new InventoryTabWindowTextField(inlineFieldWidth, 14, Component.empty(), InventoryTabWindowTextField.InputMode.NUMERIC);
 		xField.setText("0");
 		xField.setPlaceholder("0");
 		additionalSettingsPane.addScrollableChild(xField, inlineLabelWidth + inlineFieldGap, commandY);
 		commandY += 14 + rowGap;
 
-		InventoryTabWindowButton yLabelBox = new InventoryTabWindowButton(inlineLabelWidth, 14, Component.literal("Y:"), null);
+		yLabelBox = new InventoryTabWindowButton(inlineLabelWidth, 14, Component.literal("Y:"), null);
 		yLabelBox.setEnabled(false);
 		yLabelBox.setFontSize(0.60F);
 		additionalSettingsPane.addScrollableChild(yLabelBox, 0, commandY);
-		InventoryTabWindowTextField yField = new InventoryTabWindowTextField(inlineFieldWidth, 14, Component.empty(), InventoryTabWindowTextField.InputMode.NUMERIC);
+		yField = new InventoryTabWindowTextField(inlineFieldWidth, 14, Component.empty(), InventoryTabWindowTextField.InputMode.NUMERIC);
 		yField.setText("64");
 		yField.setPlaceholder("64");
 		additionalSettingsPane.addScrollableChild(yField, inlineLabelWidth + inlineFieldGap, commandY);
 		commandY += 14 + rowGap;
 
-		InventoryTabWindowButton zLabelBox = new InventoryTabWindowButton(inlineLabelWidth, 14, Component.literal("Z:"), null);
+		zLabelBox = new InventoryTabWindowButton(inlineLabelWidth, 14, Component.literal("Z:"), null);
 		zLabelBox.setEnabled(false);
 		zLabelBox.setFontSize(0.60F);
 		additionalSettingsPane.addScrollableChild(zLabelBox, 0, commandY);
-		InventoryTabWindowTextField zField = new InventoryTabWindowTextField(inlineFieldWidth, 14, Component.empty(), InventoryTabWindowTextField.InputMode.NUMERIC);
+		zField = new InventoryTabWindowTextField(inlineFieldWidth, 14, Component.empty(), InventoryTabWindowTextField.InputMode.NUMERIC);
 		zField.setText("0");
 		zField.setPlaceholder("0");
 		additionalSettingsPane.addScrollableChild(zField, inlineLabelWidth + inlineFieldGap, commandY);
 		commandY += 14 + rowGap;
 
-		InventoryTabWindowButton addButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Add"),
+		addButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Add"),
 				() -> runSelectionCommand("selection add " + readPositionTriplet(xField, yField, zField)));
 		addButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(addButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton removeButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Remove"),
+		removeButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Remove"),
 				() -> runSelectionCommand("selection remove " + readPositionTriplet(xField, yField, zField)));
 		removeButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(removeButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton pointsAddButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Add"),
+		pointsAddButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Add"),
 				() -> runSelectionCommand("selection points add " + readPositionTriplet(xField, yField, zField)));
 		pointsAddButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(pointsAddButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton pointsRemoveButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Remove"),
+		pointsRemoveButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Remove"),
 				() -> runSelectionCommand("selection points remove " + readPositionTriplet(xField, yField, zField)));
 		pointsRemoveButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(pointsRemoveButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton pointsListButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points List"),
+		pointsListButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points List"),
 				() -> runSelectionCommand("selection points list"));
 		pointsListButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(pointsListButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton pointsClearButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Clear"),
+		pointsClearButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Clear"),
 				() -> runSelectionCommand("selection points clear"));
 		pointsClearButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(pointsClearButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton pointsFillButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Fill"),
+		pointsFillButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Fill"),
 				() -> runSelectionCommand("selection points fill"));
 		pointsFillButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(pointsFillButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton pointsInfoButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Info"),
+		pointsInfoButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Points Info"),
 				() -> runSelectionCommand("selection points info"));
 		pointsInfoButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(pointsInfoButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton showButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Show"),
+		showButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Show"),
 				() -> runSelectionCommand("selection show"));
 		showButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(showButton, 0, commandY);
 		commandY += commandButtonHeight + rowGap;
 
-		InventoryTabWindowButton infoButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Info"),
+		infoButton = new InventoryTabWindowButton(commandButtonWidth, commandButtonHeight, Component.literal("Info"),
 				() -> runSelectionCommand("selection info"));
 		infoButton.setFontSize(commandButtonFont);
 		additionalSettingsPane.addScrollableChild(infoButton, 0, commandY);
@@ -321,7 +367,7 @@ public class MineCadClient implements ClientModInitializer {
 
 
 		/** SETTINGS TAB */
-		ScrollableControlPane settingsPane = new ScrollableControlPane(100, 100, Component.literal("Settings"));
+		settingsPane = new ScrollableControlPane(100, 100, Component.literal("Settings"));
 		settingsPane.setTitleStyle(0xFF2E2E2E, 0.85F);
 		final float settingsScale = 0.85F;
 		final int settingsControlWidth = settingsPane.getContentWidth();
@@ -365,8 +411,8 @@ public class MineCadClient implements ClientModInitializer {
 				"wand.enabled",
 				"wand.default_wand_item"
 		};
-		final InventoryTabWindowTextField[] settingFields = new InventoryTabWindowTextField[settingKeys.length];
-		final InventoryTabWindowKeybindField[] keybindFields = new InventoryTabWindowKeybindField[settingKeys.length];
+		settingFields = new InventoryTabWindowTextField[settingKeys.length];
+		keybindFields = new InventoryTabWindowKeybindField[settingKeys.length];
 		for (int i = 0; i < settingKeys.length; i++) {
 			String key = settingKeys[i];
 			int labelLines = wrappedLineCount(settingsFont, key, settingsLabelLogicalWidth);
@@ -406,7 +452,7 @@ public class MineCadClient implements ClientModInitializer {
 			}
 		};
 
-		InventoryTabWindowButton applySettingsButton = new InventoryTabWindowButton(settingsControlWidth, settingsButtonHeight, Component.literal("Apply Settings"), () -> {
+		applySettingsButton = new InventoryTabWindowButton(settingsControlWidth, settingsButtonHeight, Component.literal("Apply Settings"), () -> {
 			for (int i = 0; i < settingKeys.length; i++) {
 				try {
 					String value = keybindFields[i] != null ? keybindFields[i].getBindingText() : settingFields[i].getText();
@@ -421,7 +467,7 @@ public class MineCadClient implements ClientModInitializer {
 		settingsPane.addScrollableChild(applySettingsButton, 0, settingsY + 2);
 		settingsY += settingsButtonHeight + 3;
 
-		InventoryTabWindowButton resetSettingsButton = new InventoryTabWindowButton(settingsControlWidth, settingsButtonHeight, Component.literal("Reset Defaults"), () -> {
+		resetSettingsButton = new InventoryTabWindowButton(settingsControlWidth, settingsButtonHeight, Component.literal("Reset Defaults"), () -> {
 			MineFabSettings.resetToDefaults();
 			refreshSettingsFields.run();
 		});
@@ -436,7 +482,7 @@ public class MineCadClient implements ClientModInitializer {
 		/** END SETTINGS TAB */
 
 		/** SAVES TAB */
-		InventoryTabTextPanel savesPane = new InventoryTabTextPanel(100, 100, Component.literal("Saves"));
+		savesPane = new InventoryTabTextPanel(100, 100, Component.literal("Saves"));
 		savesPane.setScrollbarSize(TEXT_PANEL_SCROLLBAR_SIZE);
 		savesPane.setStyledLines(List.of(
 				InventoryTabTextPanel.line("Saves coming soon.", 0xFF2E2E2E, 1.0F)
@@ -448,7 +494,7 @@ public class MineCadClient implements ClientModInitializer {
 		/** END SAVES TAB */
 
 		/** HELP TAB */
-		InventoryTabTextPanel helpPane = new InventoryTabTextPanel(100, 100, Component.literal("Help"));
+		helpPane = new InventoryTabTextPanel(100, 100, Component.literal("Help"));
 		helpPane.setScrollbarSize(TEXT_PANEL_SCROLLBAR_SIZE);
 		helpPane.setStyledLines(List.of(
 				InventoryTabTextPanel.line("Middle-drag in 3D to orbit", 0xFF2E2E2E, 1.0F),
@@ -463,7 +509,7 @@ public class MineCadClient implements ClientModInitializer {
 		/** END HELP TAB */
 
 		/** Info Tab */
-		InventoryTabTextPanel infoPane = new InventoryTabTextPanel(100, 100, Component.literal("Info"));
+		infoPane = new InventoryTabTextPanel(100, 100, Component.literal("Info"));
 		infoPane.setScrollbarSize(TEXT_PANEL_SCROLLBAR_SIZE);
 		infoPane.setStyledLines(List.of(
 				InventoryTabTextPanel.line("MineCad Mod Info:", 0xFF1D3557, 1.1F),
@@ -487,7 +533,7 @@ public class MineCadClient implements ClientModInitializer {
 
 
 		/** Consolidating the left side panes into an array */
-		InventoryTabWindow[] panes = new InventoryTabWindow[] { view3dPane, /*selectionPane,*/ settingsPane, savesPane, helpPane, infoPane };
+		panes = new InventoryTabWindow[] { view3dPane, /*selectionPane,*/ settingsPane, savesPane, helpPane, infoPane };
 		for (InventoryTabWindow pane : panes) {
 			mainWindow.addChild(pane);
 			pane.setAnchor(InventoryTabWindow.Anchor.TOP_LEFT);
@@ -497,7 +543,7 @@ public class MineCadClient implements ClientModInitializer {
 
 
 
-		InventorySideTabButton[] leftSideTabs = new InventorySideTabButton[panes.length];
+		leftSideTabs = new InventorySideTabButton[panes.length];
 
 		leftSideTabs[0] = (InventorySideTabButton) mainWindow.addChild(new InventorySideTabButton(Component.literal("3D"),
 				() -> activateLeftTab(0, panes, leftSideTabs)));
@@ -521,7 +567,7 @@ public class MineCadClient implements ClientModInitializer {
 		/** End consolidating the panes into an array */
 
 
-		InventoryTab mineCadTab = new InventoryTab(0, 0, Component.literal("My GUI"), null, false, () -> {}, mainWindow);
+		mineCadTab = new InventoryTab(0, 0, Component.literal("My GUI"), null, false, () -> {}, mainWindow);
 		inventoryTabManager = new InventoryTabManager(mineCadTab);
 		inventoryTabManager.setAdditionalTabsOffset(pendingTabsOffsetX, pendingTabsOffsetY);
 

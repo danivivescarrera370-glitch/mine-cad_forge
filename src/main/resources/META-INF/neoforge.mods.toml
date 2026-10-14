@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "[26,)"
+license = "CC0-1.0"
+issueTrackerURL = "https://github.com"
+
+[[mods]]
+modId = "mine-cad-forge"
+version = "${version}"
+displayName = "Minecad Reforged"
+displayURL = "https://fabricmc.net"
+logoFile = "assets/mine-cad/icon.png"
+authors = "Me!"
+description = '''
+This is an example description! Tell everyone what your mod is about!
+'''
+
+[[dependencies.mine-cad-forge]]
+modId = "neoforge"
+type = "required"
+versionRange = "[26.2,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.mine-cad-forge]]
+modId = "minecraft"
+type = "required"
+versionRange = "[26.2, 26.3)"
+ordering = "NONE"
+side = "CLIENT"
